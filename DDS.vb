@@ -57,9 +57,7 @@ Public Class DDS
 
         If MipMaps = -1 Then MipMaps = CalcMips(SourceImage.Width, SourceImage.Height)
 
-        If Alpha = True Then
-            DDS_PixelFlags.Add(PixelFlags.DDPF_ALPHAPIXELS)
-        End If
+        If Alpha = True Then DDS_PixelFlags.Add(PixelFlags.DDPF_ALPHAPIXELS)
 
         If Compress = True Then
             DDS_SurfaceFlags.Add(SurfaceFlags.DDSD_PITCH)
@@ -172,24 +170,24 @@ Public Class DDS
         Return Result.ToArray
     End Function
 
-    Private Function BlockCompress(Source As Image) As Byte()               ' BC1_UNORM
+    Private Function BlockCompress(Source As Image) As Byte()               ' BC1_UNORM with Dithering
         Dim Result As New List(Of Byte)
 
-        Using SourceDirect As New DirectBitmap(Source)
-            For y = 0 To SourceDirect.Height - 1 Step 4
-                For x = 0 To SourceDirect.Width - 1 Step 4
+        Using SourceLocked As New LockbitsBitmap(Source, Imaging.PixelFormat.Format16bppRgb565)
+            For y = 0 To Source.Height - 1 Step 4
+                For x = 0 To Source.Width - 1 Step 4
 
                     Dim ValueMatrix()() As Integer = {({0, 0, 0, 0}), ({0, 0, 0, 0}), ({0, 0, 0, 0}), ({0, 0, 0, 0})}
 
                     Dim MaxPixelValue As Integer = -1
                     Dim MinPixelValue As Integer = 66000
-                    Dim MaxPixel As New Color
-                    Dim MinPixel As New Color
+                    Dim MaxPixel As Byte() = {0, 0}
+                    Dim MinPixel As Byte() = {0, 0}
 
                     For j = 0 To 3
                         For i = 0 To 3
-                            Dim CurColor As Color = SourceDirect.GetPixel(x + i, y + j)
-                            Dim CurValue As Integer = Convert.ToInt32(RGB_888_To_565(CurColor), 2)
+                            Dim CurColor As Byte() = SourceLocked.GetPixelBytes(x + i, y + j)
+                            Dim CurValue As Integer = BitConverter.ToUInt16(CurColor, 0)
                             ValueMatrix(j)(i) = CurValue
                             If CurValue > MaxPixelValue Then
                                 MaxPixelValue = CurValue
@@ -202,13 +200,8 @@ Public Class DDS
                         Next
                     Next
 
-                    Dim Color0 As String = RGB_888_To_565(MaxPixel)
-                    Dim Color1 As String = RGB_888_To_565(MinPixel)
-
-                    Result.Add(Convert.ToByte(Color0.Substring(8, 8), 2))
-                    Result.Add(Convert.ToByte(Color0.Substring(0, 8), 2))
-                    Result.Add(Convert.ToByte(Color1.Substring(8, 8), 2))
-                    Result.Add(Convert.ToByte(Color1.Substring(0, 8), 2))
+                    Result.AddRange(MaxPixel)
+                    Result.AddRange(MinPixel)
 
                     Dim StepVal As Integer = Math.Floor((MaxPixelValue - MinPixelValue) / 3)
 
@@ -255,7 +248,7 @@ Public Class DDS
                     For j = 0 To 3
                         For i = 0 To 3
                             Dim CurColor As Color = SourceDirect.GetPixel(x + i, y + j)
-                            Dim CurValue As Integer = Convert.ToInt32(RGB_888_To_565(CurColor), 2)
+                            Dim CurValue As Integer = RGB_888_To_565(CurColor)
                             ValueMatrix(j)(i) = IIf(CurColor.A < &HFF, 0, CurValue)
                             If CurValue > MaxPixelValue Then
                                 MaxPixelValue = CurValue
@@ -268,13 +261,8 @@ Public Class DDS
                         Next
                     Next
 
-                    Dim Color0 As String = RGB_888_To_565(MinPixel)
-                    Dim Color1 As String = RGB_888_To_565(MaxPixel)
-
-                    Result.Add(Convert.ToByte(Color0.Substring(8, 8), 2))
-                    Result.Add(Convert.ToByte(Color0.Substring(0, 8), 2))
-                    Result.Add(Convert.ToByte(Color1.Substring(8, 8), 2))
-                    Result.Add(Convert.ToByte(Color1.Substring(0, 8), 2))
+                    Result.AddRange(BitConverter.GetBytes(RGB_888_To_565(MinPixel)))
+                    Result.AddRange(BitConverter.GetBytes(RGB_888_To_565(MaxPixel)))
 
                     Dim StepVal As Integer = Math.Floor((MaxPixelValue - MinPixelValue) / 2)
 
@@ -311,12 +299,8 @@ Public Class DDS
         IO.File.WriteAllBytes(FilePath, FileBytes.ToArray)
     End Sub
 
-    Private Function RGB_888_To_565(Source As Color) As String
-        Dim Result As New List(Of Byte)
-        Dim R5Val As Integer = Math.Floor(Source.R * 0.122)
-        Dim G6Val As Integer = Math.Floor(Source.G * 0.248)
-        Dim B5Val As Integer = Math.Floor(Source.B * 0.122)
-        Return PrepBits(R5Val, 5) & PrepBits(G6Val, 6) & PrepBits(B5Val, 5)
+    Private Function RGB_888_To_565(Source As Color) As UShort ' Black magic fuckery
+        Return ((Source.R And &B11111000) << 8) Or ((Source.G And &B11111100) << 3) Or (Source.B >> 3)
     End Function
 
     Private Function CalcMips(Width As Integer, Height As Integer) As Integer
@@ -341,10 +325,6 @@ Public Class DDS
             Gr.DrawImage(Source, 0, 0, Result.Width, Result.Height)
         End Using
         Return Result
-    End Function
-
-    Private Function PrepBits(Source As Integer, Length As Integer) As String
-        Return Convert.ToString(Source, 2).PadLeft(Length, "0"c)
     End Function
 
     Private Function OrderBytes(Source As Integer()) As Byte()
