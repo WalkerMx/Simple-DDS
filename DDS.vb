@@ -179,49 +179,40 @@ Public Class DDS
 
                     Dim ValueMatrix()() As Integer = {({0, 0, 0, 0}), ({0, 0, 0, 0}), ({0, 0, 0, 0}), ({0, 0, 0, 0})}
 
-                    Dim MaxPixelValue As Integer = -1
-                    Dim MinPixelValue As Integer = 66000
-                    Dim MaxPixel As Byte() = {0, 0}
-                    Dim MinPixel As Byte() = {0, 0}
+                    Dim MaxPixelValue As UShort = &H0
+                    Dim MinPixelValue As UShort = &HFFFF
 
                     For j = 0 To 3
                         For i = 0 To 3
                             Dim CurColor As Byte() = SourceLocked.GetPixelBytes(x + i, y + j)
                             Dim CurValue As Integer = BitConverter.ToUInt16(CurColor, 0)
                             ValueMatrix(j)(i) = CurValue
-                            If CurValue > MaxPixelValue Then
-                                MaxPixelValue = CurValue
-                                MaxPixel = CurColor
-                            End If
-                            If CurValue < MinPixelValue Then
-                                MinPixelValue = CurValue
-                                MinPixel = CurColor
-                            End If
+                            If CurValue > MaxPixelValue Then MaxPixelValue = CurValue
+                            If CurValue < MinPixelValue Then MinPixelValue = CurValue
                         Next
                     Next
 
-                    Result.AddRange(MaxPixel)
-                    Result.AddRange(MinPixel)
+                    Result.AddRange(BitConverter.GetBytes(MaxPixelValue))
+                    Result.AddRange(BitConverter.GetBytes(MinPixelValue))
 
                     Dim StepVal As Integer = Math.Floor((MaxPixelValue - MinPixelValue) / 3)
 
                     For j = 0 To 3
-                        Dim BitString As New Text.StringBuilder
+                        Dim BitByte As Byte = &B0
                         For i = 3 To 0 Step -1
-                            Dim CurValue As Integer = ValueMatrix(j)(i)
-                            Select Case CurValue
+                            BitByte <<= 2
+                            Select Case ValueMatrix(j)(i)
                                 Case >= (StepVal * 2) + MinPixelValue
-                                    BitString.Append("00")
+                                    BitByte = BitByte Or &B0
                                 Case >= StepVal + MinPixelValue
-                                    BitString.Append("10")
+                                    BitByte = BitByte Or &B10
                                 Case >= MinPixelValue
-                                    BitString.Append("11")
+                                    BitByte = BitByte Or &B11
                                 Case Else
-                                    BitString.Append("01")
+                                    BitByte = BitByte Or &B1
                             End Select
                         Next
-                        Result.Add(Convert.ToByte(BitString.ToString, 2))
-                        BitString.Clear()
+                        Result.Add(BitByte)
                     Next
 
                 Next
@@ -240,49 +231,40 @@ Public Class DDS
 
                     Dim ValueMatrix()() As Integer = {({0, 0, 0, 0}), ({0, 0, 0, 0}), ({0, 0, 0, 0}), ({0, 0, 0, 0})}
 
-                    Dim MaxPixelValue As Integer = -1
-                    Dim MinPixelValue As Integer = 66000
-                    Dim MaxPixel As New Color
-                    Dim MinPixel As New Color
+                    Dim MaxPixelValue As UShort = &H0
+                    Dim MinPixelValue As UShort = &HFFFF
 
                     For j = 0 To 3
                         For i = 0 To 3
                             Dim CurColor As Color = SourceDirect.GetPixel(x + i, y + j)
                             Dim CurValue As Integer = RGB_888_To_565(CurColor)
                             ValueMatrix(j)(i) = IIf(CurColor.A < &HFF, 0, CurValue)
-                            If CurValue > MaxPixelValue Then
-                                MaxPixelValue = CurValue
-                                MaxPixel = CurColor
-                            End If
-                            If CurValue < MinPixelValue Then
-                                MinPixelValue = CurValue
-                                MinPixel = CurColor
-                            End If
+                            If CurValue > MaxPixelValue Then MaxPixelValue = CurValue
+                            If CurValue < MinPixelValue Then MinPixelValue = CurValue
                         Next
                     Next
 
-                    Result.AddRange(BitConverter.GetBytes(RGB_888_To_565(MinPixel)))
-                    Result.AddRange(BitConverter.GetBytes(RGB_888_To_565(MaxPixel)))
+                    Result.AddRange(BitConverter.GetBytes(MinPixelValue))
+                    Result.AddRange(BitConverter.GetBytes(MaxPixelValue))
 
-                    Dim StepVal As Integer = Math.Floor((MaxPixelValue - MinPixelValue) / 2)
+                    Dim StepVal As Integer = Math.Floor((MaxPixelValue - MinPixelValue) >> 1)
 
                     For j = 0 To 3
-                        Dim BitString As New Text.StringBuilder
+                        Dim BitByte As Byte = &B0
                         For i = 3 To 0 Step -1
-                            Dim CurValue As Integer = ValueMatrix(j)(i)
-                            Select Case CurValue
+                            BitByte <<= 2
+                            Select Case ValueMatrix(j)(i)
                                 Case = 0
-                                    BitString.Append("11")
+                                    BitByte = BitByte Or &B11
                                 Case >= StepVal + MinPixelValue
-                                    BitString.Append("00")
+                                    BitByte = BitByte Or &B0
                                 Case >= MinPixelValue
-                                    BitString.Append("10")
+                                    BitByte = BitByte Or &B10
                                 Case Else
-                                    BitString.Append("01")
+                                    BitByte = BitByte Or &B1
                             End Select
                         Next
-                        Result.Add(Convert.ToByte(BitString.ToString, 2))
-                        BitString.Clear()
+                        Result.Add(BitByte)
                     Next
 
                 Next
@@ -299,7 +281,7 @@ Public Class DDS
         IO.File.WriteAllBytes(FilePath, FileBytes.ToArray)
     End Sub
 
-    Private Function RGB_888_To_565(Source As Color) As UShort ' Black magic fuckery
+    Private Function RGB_888_To_565(Source As Color) As UShort
         Return ((Source.R And &B11111000) << 8) Or ((Source.G And &B11111100) << 3) Or (Source.B >> 3)
     End Function
 
@@ -318,7 +300,7 @@ Public Class DDS
     End Function
 
     Private Function HalveImage(Source As Image) As Image
-        Dim Result As New Bitmap(CInt(Source.Width * 0.5), CInt(Source.Height * 0.5))
+        Dim Result As New Bitmap(Source.Width >> 1, Source.Height >> 1)
         Using Gr As Graphics = Graphics.FromImage(Result)
             Gr.InterpolationMode = Drawing2D.InterpolationMode.HighQualityBilinear
             Gr.PixelOffsetMode = Drawing2D.PixelOffsetMode.Half
