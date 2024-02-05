@@ -1,4 +1,4 @@
-﻿' DirectBitmap Class by WalkerMx
+﻿' DDS Class by WalkerMx
 ' Based on the documentation found here:
 ' http://doc.51windows.net/directx9_sdk/graphics/reference/DDSFileReference/ddsfileformat.htm
 
