@@ -3,10 +3,11 @@ This is intended to be a dead-simple tool for creating DDS files. The _DDS.vb_ c
 
 # Features Supported
 - BC1 Compression (DXT1)
+- BC3 Compression (DXT5)
 - Auto-generate MipMaps
 - Alpha Channel
 
 # Notes
 Both B8G8R8X8 and B8G8R8A8 uncompressed formats are supported.  Uncompressed 24BBP B8G8R8 is technically possible, but has very poor compatibility.
 
-BC1 compression usually looks pretty rough.  BC1 with 1-bit alpha is just awful.
+BC1 and BC3 compression usually look pretty rough.  BC1 with 1-bit alpha is awful unless you have perfect 'cutout' textures, BC3 is recommended for alpah.
