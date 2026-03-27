@@ -23,87 +23,119 @@ Partial Class Form1
     <System.Diagnostics.DebuggerStepThrough()> _
     Private Sub InitializeComponent()
         Me.Button1 = New System.Windows.Forms.Button()
-        Me.CheckBox1 = New System.Windows.Forms.CheckBox()
-        Me.CheckBox2 = New System.Windows.Forms.CheckBox()
-        Me.NumericUpDown1 = New System.Windows.Forms.NumericUpDown()
-        Me.Label1 = New System.Windows.Forms.Label()
-        CType(Me.NumericUpDown1, System.ComponentModel.ISupportInitialize).BeginInit()
+        Me.CompressionCheckBox = New System.Windows.Forms.CheckBox()
+        Me.MipMapCheckBox = New System.Windows.Forms.CheckBox()
+        Me.NoAlphaRB = New System.Windows.Forms.RadioButton()
+        Me.OneBitAlphaRB = New System.Windows.Forms.RadioButton()
+        Me.EightBitAlphaRB = New System.Windows.Forms.RadioButton()
+        Me.ExtendedHeaderCheckBox = New System.Windows.Forms.CheckBox()
         Me.SuspendLayout()
         '
         'Button1
         '
-        Me.Button1.Location = New System.Drawing.Point(16, 104)
+        Me.Button1.Location = New System.Drawing.Point(11, 80)
+        Me.Button1.Margin = New System.Windows.Forms.Padding(2)
         Me.Button1.Name = "Button1"
-        Me.Button1.Size = New System.Drawing.Size(199, 67)
+        Me.Button1.Size = New System.Drawing.Size(182, 34)
         Me.Button1.TabIndex = 0
         Me.Button1.Text = "Create"
         Me.Button1.UseVisualStyleBackColor = True
         '
-        'CheckBox1
+        'CompressionCheckBox
         '
-        Me.CheckBox1.AutoSize = True
-        Me.CheckBox1.Location = New System.Drawing.Point(95, 74)
-        Me.CheckBox1.Name = "CheckBox1"
-        Me.CheckBox1.Size = New System.Drawing.Size(76, 24)
-        Me.CheckBox1.TabIndex = 2
-        Me.CheckBox1.Text = "Alpha"
-        Me.CheckBox1.UseVisualStyleBackColor = True
+        Me.CompressionCheckBox.AutoSize = True
+        Me.CompressionCheckBox.Checked = True
+        Me.CompressionCheckBox.CheckState = System.Windows.Forms.CheckState.Checked
+        Me.CompressionCheckBox.Location = New System.Drawing.Point(12, 34)
+        Me.CompressionCheckBox.Margin = New System.Windows.Forms.Padding(2)
+        Me.CompressionCheckBox.Name = "CompressionCheckBox"
+        Me.CompressionCheckBox.Size = New System.Drawing.Size(86, 17)
+        Me.CompressionCheckBox.TabIndex = 3
+        Me.CompressionCheckBox.Text = "Compression"
+        Me.CompressionCheckBox.UseVisualStyleBackColor = True
         '
-        'CheckBox2
+        'MipMapCheckBox
         '
-        Me.CheckBox2.AutoSize = True
-        Me.CheckBox2.Checked = True
-        Me.CheckBox2.CheckState = System.Windows.Forms.CheckState.Checked
-        Me.CheckBox2.Location = New System.Drawing.Point(95, 44)
-        Me.CheckBox2.Name = "CheckBox2"
-        Me.CheckBox2.Size = New System.Drawing.Size(107, 24)
-        Me.CheckBox2.TabIndex = 3
-        Me.CheckBox2.Text = "Compress"
-        Me.CheckBox2.UseVisualStyleBackColor = True
+        Me.MipMapCheckBox.AutoSize = True
+        Me.MipMapCheckBox.Location = New System.Drawing.Point(12, 12)
+        Me.MipMapCheckBox.Name = "MipMapCheckBox"
+        Me.MipMapCheckBox.Size = New System.Drawing.Size(69, 17)
+        Me.MipMapCheckBox.TabIndex = 4
+        Me.MipMapCheckBox.Text = "MipMaps"
+        Me.MipMapCheckBox.UseVisualStyleBackColor = True
         '
-        'NumericUpDown1
+        'NoAlphaRB
         '
-        Me.NumericUpDown1.Location = New System.Drawing.Point(95, 12)
-        Me.NumericUpDown1.Maximum = New Decimal(New Integer() {10, 0, 0, 0})
-        Me.NumericUpDown1.Minimum = New Decimal(New Integer() {1, 0, 0, -2147483648})
-        Me.NumericUpDown1.Name = "NumericUpDown1"
-        Me.NumericUpDown1.Size = New System.Drawing.Size(120, 26)
-        Me.NumericUpDown1.TabIndex = 4
-        Me.NumericUpDown1.Value = New Decimal(New Integer() {1, 0, 0, -2147483648})
+        Me.NoAlphaRB.AutoSize = True
+        Me.NoAlphaRB.Checked = True
+        Me.NoAlphaRB.Location = New System.Drawing.Point(103, 12)
+        Me.NoAlphaRB.Name = "NoAlphaRB"
+        Me.NoAlphaRB.Size = New System.Drawing.Size(69, 17)
+        Me.NoAlphaRB.TabIndex = 5
+        Me.NoAlphaRB.TabStop = True
+        Me.NoAlphaRB.Text = "No Alpha"
+        Me.NoAlphaRB.UseVisualStyleBackColor = True
         '
-        'Label1
+        'OneBitAlphaRB
         '
-        Me.Label1.AutoSize = True
-        Me.Label1.Location = New System.Drawing.Point(12, 14)
-        Me.Label1.Name = "Label1"
-        Me.Label1.Size = New System.Drawing.Size(77, 20)
-        Me.Label1.TabIndex = 5
-        Me.Label1.Text = "MipMaps:"
+        Me.OneBitAlphaRB.AutoSize = True
+        Me.OneBitAlphaRB.Location = New System.Drawing.Point(103, 35)
+        Me.OneBitAlphaRB.Name = "OneBitAlphaRB"
+        Me.OneBitAlphaRB.Size = New System.Drawing.Size(75, 17)
+        Me.OneBitAlphaRB.TabIndex = 6
+        Me.OneBitAlphaRB.Text = "1-bit Alpha"
+        Me.OneBitAlphaRB.UseVisualStyleBackColor = True
+        '
+        'EightBitAlphaRB
+        '
+        Me.EightBitAlphaRB.AutoSize = True
+        Me.EightBitAlphaRB.Location = New System.Drawing.Point(103, 58)
+        Me.EightBitAlphaRB.Name = "EightBitAlphaRB"
+        Me.EightBitAlphaRB.Size = New System.Drawing.Size(75, 17)
+        Me.EightBitAlphaRB.TabIndex = 7
+        Me.EightBitAlphaRB.Text = "8-bit Alpha"
+        Me.EightBitAlphaRB.UseVisualStyleBackColor = True
+        '
+        'ExtendedHeaderCheckBox
+        '
+        Me.ExtendedHeaderCheckBox.AutoSize = True
+        Me.ExtendedHeaderCheckBox.Checked = True
+        Me.ExtendedHeaderCheckBox.CheckState = System.Windows.Forms.CheckState.Checked
+        Me.ExtendedHeaderCheckBox.Location = New System.Drawing.Point(12, 56)
+        Me.ExtendedHeaderCheckBox.Name = "ExtendedHeaderCheckBox"
+        Me.ExtendedHeaderCheckBox.Size = New System.Drawing.Size(53, 17)
+        Me.ExtendedHeaderCheckBox.TabIndex = 8
+        Me.ExtendedHeaderCheckBox.Text = "DX10"
+        Me.ExtendedHeaderCheckBox.UseVisualStyleBackColor = True
         '
         'Form1
         '
-        Me.AutoScaleDimensions = New System.Drawing.SizeF(9.0!, 20.0!)
+        Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
-        Me.ClientSize = New System.Drawing.Size(230, 186)
-        Me.Controls.Add(Me.Label1)
-        Me.Controls.Add(Me.NumericUpDown1)
-        Me.Controls.Add(Me.CheckBox2)
-        Me.Controls.Add(Me.CheckBox1)
+        Me.ClientSize = New System.Drawing.Size(204, 125)
+        Me.Controls.Add(Me.ExtendedHeaderCheckBox)
+        Me.Controls.Add(Me.EightBitAlphaRB)
+        Me.Controls.Add(Me.OneBitAlphaRB)
+        Me.Controls.Add(Me.NoAlphaRB)
+        Me.Controls.Add(Me.MipMapCheckBox)
+        Me.Controls.Add(Me.CompressionCheckBox)
         Me.Controls.Add(Me.Button1)
         Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle
+        Me.Margin = New System.Windows.Forms.Padding(2)
         Me.MaximizeBox = False
         Me.MinimizeBox = False
         Me.Name = "Form1"
         Me.Text = "DDS Tool"
-        CType(Me.NumericUpDown1, System.ComponentModel.ISupportInitialize).EndInit()
         Me.ResumeLayout(False)
         Me.PerformLayout()
 
     End Sub
 
     Friend WithEvents Button1 As Button
-    Friend WithEvents CheckBox1 As CheckBox
-    Friend WithEvents CheckBox2 As CheckBox
-    Friend WithEvents NumericUpDown1 As NumericUpDown
-    Friend WithEvents Label1 As Label
+    Friend WithEvents CompressionCheckBox As CheckBox
+    Friend WithEvents MipMapCheckBox As CheckBox
+    Friend WithEvents NoAlphaRB As RadioButton
+    Friend WithEvents OneBitAlphaRB As RadioButton
+    Friend WithEvents EightBitAlphaRB As RadioButton
+    Friend WithEvents ExtendedHeaderCheckBox As CheckBox
 End Class
