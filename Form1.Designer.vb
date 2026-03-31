@@ -29,11 +29,12 @@ Partial Class Form1
         Me.OneBitAlphaRB = New System.Windows.Forms.RadioButton()
         Me.EightBitAlphaRB = New System.Windows.Forms.RadioButton()
         Me.ExtendedHeaderCheckBox = New System.Windows.Forms.CheckBox()
+        Me.QualityCheckBox = New System.Windows.Forms.CheckBox()
         Me.SuspendLayout()
         '
         'Button1
         '
-        Me.Button1.Location = New System.Drawing.Point(11, 80)
+        Me.Button1.Location = New System.Drawing.Point(11, 101)
         Me.Button1.Margin = New System.Windows.Forms.Padding(2)
         Me.Button1.Name = "Button1"
         Me.Button1.Size = New System.Drawing.Size(182, 34)
@@ -108,11 +109,24 @@ Partial Class Form1
         Me.ExtendedHeaderCheckBox.Text = "DX10"
         Me.ExtendedHeaderCheckBox.UseVisualStyleBackColor = True
         '
+        'QualityCheckBox
+        '
+        Me.QualityCheckBox.AutoSize = True
+        Me.QualityCheckBox.Checked = True
+        Me.QualityCheckBox.CheckState = System.Windows.Forms.CheckState.Checked
+        Me.QualityCheckBox.Location = New System.Drawing.Point(12, 79)
+        Me.QualityCheckBox.Name = "QualityCheckBox"
+        Me.QualityCheckBox.Size = New System.Drawing.Size(83, 17)
+        Me.QualityCheckBox.TabIndex = 9
+        Me.QualityCheckBox.Text = "High Quality"
+        Me.QualityCheckBox.UseVisualStyleBackColor = True
+        '
         'Form1
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
-        Me.ClientSize = New System.Drawing.Size(204, 125)
+        Me.ClientSize = New System.Drawing.Size(204, 145)
+        Me.Controls.Add(Me.QualityCheckBox)
         Me.Controls.Add(Me.ExtendedHeaderCheckBox)
         Me.Controls.Add(Me.EightBitAlphaRB)
         Me.Controls.Add(Me.OneBitAlphaRB)
@@ -138,4 +152,5 @@ Partial Class Form1
     Friend WithEvents OneBitAlphaRB As RadioButton
     Friend WithEvents EightBitAlphaRB As RadioButton
     Friend WithEvents ExtendedHeaderCheckBox As CheckBox
+    Friend WithEvents QualityCheckBox As CheckBox
 End Class
