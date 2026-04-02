@@ -1,4 +1,8 @@
-﻿Public Module DDS_Common
+﻿' DDS Common Class by WalkerMx
+' Based on the documentation found here:
+' http://doc.51windows.net/directx9_sdk/graphics/reference/DDSFileReference/ddsfileformat.htm
+
+Public Module DDS_Common
 
     <Flags>
     Public Enum DDS_SurfaceFlags
@@ -15,8 +19,11 @@
     <Flags>
     Public Enum DDS_PixelFlags
         DDPF_ALPHAPIXELS = &H1
+        DDPF_ALPHA = &H2
         DDPF_FOURCC = &H4
         DDPF_RGB = &H40
+        DDPF_YUV = &H200
+        DDPF_LUMINANCE = &H20000
     End Enum
 
     <Flags>
@@ -27,10 +34,29 @@
     End Enum
 
     <Flags>
+    Public Enum DDS_Caps2
+        DDSCAPS2_CUBEMAP = &H200
+        DDSCAPS2_CUBEMAP_POSITIVEX = &H400
+        DDSCAPS2_CUBEMAP_NEGATIVEX = &H800
+        DDSCAPS2_CUBEMAP_POSITIVEY = &H1000
+        DDSCAPS2_CUBEMAP_NEGATIVEY = &H2000
+        DDSCAPS2_CUBEMAP_POSITIVEZ = &H4000
+        DDSCAPS2_CUBEMAP_NEGATIVEZ = &H8000
+        DDSCAPS2_VOLUME = &H200000
+    End Enum
+
+    <Flags>
     Public Enum DXGI_Format
         DXGI_FORMAT_UNKNOWN = &H0
+        DXGI_FORMAT_R32G32B32A32_FLOAT = &H2
+        DXGI_FORMAT_R16G16B16A16_UNORM = &HB
         DXGI_FORMAT_BC1_UNORM = &H47
+        DXGI_FORMAT_BC2_UNORM = &H4A
         DXGI_FORMAT_BC3_UNORM = &H4D
+        DXGI_FORMAT_BC4_UNORM = &H50
+        DXGI_FORMAT_BC5_UNORM = &H53
+        DXGI_FORMAT_BC6H_UF16 = &H5F
+        DXGI_FORMAT_BC7_UNORM = &H62
         DXGI_FORMAT_B8G8R8A8_UNORM = &H57
         DXGI_FORMAT_B8G8R8X8_UNORM = &H58
     End Enum

@@ -10,19 +10,30 @@ Public Class DDS_Encoder
 
     Public Disposed As Boolean
 
+    Private SourcePath As String
+    Private AlphaMode As Integer
+    Private MipMapEnabled As Boolean
+    Private CompressionEnabled As Boolean
+    Private HighQualityEnabled As Boolean
+
+    Private Width As Integer
+    Private Height As Integer
+
+    Private MipCount As Integer
+
     Private HeaderBytes As New List(Of Byte)
     Private PayloadBytes As New List(Of Byte)
 
     ''' <summary>
     ''' Creates a DDS Image from a standard Image file.
     ''' </summary>
-    ''' <param name="SourceImage">Image to create DDS from.</param>
+    ''' <param name="Source">Image to create DDS from.</param>
     ''' <param name="Alpha">Alpha support.  0 for Opaque, 1 for 1-bit Alpha, 2 for full 8-bit alpha.</param>
     ''' <param name="Compress">Applies DXT1 or DXT5 compression depending on Alpha Mode.</param>
     ''' <param name="MipMaps">Create mipmaps for distant objects.  Increases file size by ~33%.</param>
     ''' <param name="ExtendedHeader">Add extended DX10 header.  Disable for legacy texture support.</param>
     ''' <param name="HighQuality">Use advanced proccessing for compressing blocks at the cost speed.</param>
-    Public Sub New(SourceImage As Image, Alpha As Integer, Compress As Boolean, MipMaps As Boolean, ExtendedHeader As Boolean, Optional HighQuality As Boolean = True)
+    Public Sub New(Source As String, Alpha As Integer, Compress As Boolean, MipMaps As Boolean, ExtendedHeader As Boolean, Optional HighQuality As Boolean = True)
 
         Dim SurfaceFlags As New DDS_SurfaceFlags
         Dim PixelFlags As DDS_PixelFlags
@@ -35,16 +46,26 @@ Public Class DDS_Encoder
         Dim PLS As Integer
         Dim FourCC As String = "DXT1"
         Dim BytesPerBlock As Integer = 8
-        Dim MipCount As Integer = 0
         Dim RMask As Byte() = {0, 0, &HFF, 0}
         Dim GMask As Byte() = {0, &HFF, 0, 0}
         Dim BMask As Byte() = {&HFF, 0, 0, 0}
         Dim AMask As Byte() = {0, 0, 0, &HFF}
 
+        SourcePath = Source
+        AlphaMode = Alpha
+        MipMapEnabled = MipMaps
+        CompressionEnabled = Compress
+        HighQualityEnabled = HighQuality
+
+        Using TempImage As Image = Image.FromFile(Source)
+            Width = TempImage.Width
+            Height = TempImage.Height
+        End Using
+
         SurfaceFlags = DDS_SurfaceFlags.DDSD_CAPS Or DDS_SurfaceFlags.DDSD_PIXELFORMAT Or DDS_SurfaceFlags.DDSD_WIDTH Or DDS_SurfaceFlags.DDSD_HEIGHT
         Caps1 = DDS_Caps1.DDSCAPS_TEXTURE
 
-        If MipMaps Then MipCount = CalcMips(SourceImage.Width, SourceImage.Height)
+        If MipMaps Then MipCount = CalcMips(Width, Height)
 
         If Alpha > 0 Then
             PixelFlags = PixelFlags Or DDS_PixelFlags.DDPF_ALPHAPIXELS
@@ -59,7 +80,7 @@ Public Class DDS_Encoder
                 FourCC = "DXT5"
                 BytesPerBlock = 16
             End If
-            PLS = Math.Max(1, ((SourceImage.Width + 3) \ 4)) * BytesPerBlock * Math.Max(1, ((SourceImage.Height + 3) \ 4))
+            PLS = Math.Max(1, ((Width + 3) \ 4)) * BytesPerBlock * Math.Max(1, ((Height + 3) \ 4))
             RMask = {0, 0, 0, 0}
             GMask = {0, 0, 0, 0}
             BMask = {0, 0, 0, 0}
@@ -68,7 +89,7 @@ Public Class DDS_Encoder
             FourCC = ""
             SurfaceFlags = SurfaceFlags Or DDS_SurfaceFlags.DDSD_PITCH
             PixelFlags = PixelFlags Or DDS_PixelFlags.DDPF_RGB
-            PLS = SourceImage.Width * 4
+            PLS = Width * 4
         End If
 
         If MipMaps Then
@@ -109,8 +130,8 @@ Public Class DDS_Encoder
         HeaderBytes.AddRange(OrderBytes("DDS "))                                ' dwMagic
         HeaderBytes.AddRange(OrderBytes(124))                                   ' dwSize
         HeaderBytes.AddRange(OrderBytes(SurfaceFlags))                          ' dwFlags
-        HeaderBytes.AddRange(OrderBytes(SourceImage.Height))                    ' dwHeight
-        HeaderBytes.AddRange(OrderBytes(SourceImage.Width))                     ' dwWidth
+        HeaderBytes.AddRange(OrderBytes(Height))                                ' dwHeight
+        HeaderBytes.AddRange(OrderBytes(Width))                                 ' dwWidth
         HeaderBytes.AddRange(OrderBytes(PLS))                                   ' dwPitchOrLinearSize
         HeaderBytes.AddRange(OrderBytes(0))                                     ' dwDepth
         HeaderBytes.AddRange(OrderBytes(MipCount))                              ' dwMipMapCount
@@ -145,20 +166,26 @@ Public Class DDS_Encoder
             HeaderBytes.AddRange(OrderBytes(MiscFlag2))                         ' dwMiscFlags2
         End If
 
-        Dim CurrentW As Integer = SourceImage.Width
-        Dim CurrentH As Integer = SourceImage.Height
-        Dim CurrentBytes As Byte() = ExtractBitmapBytes(SourceImage)
+    End Sub
 
-        SourceImage.Dispose()
+    Private Sub BeginEncode()
 
-        PayloadBytes = GetImageData(CurrentBytes, CurrentW, CurrentH, Alpha, Compress, HighQuality).ToList()
+        Dim CurrentW As Integer = Width
+        Dim CurrentH As Integer = Height
+        Dim CurrentBytes As Byte()
 
-        If MipMaps Then
+        Using TempImage As Image = Image.FromFile(SourcePath)
+            CurrentBytes = ExtractBitmapBytes(TempImage)
+        End Using
+
+        PayloadBytes = GetImageData(CurrentBytes, CurrentW, CurrentH, AlphaMode, CompressionEnabled, HighQualityEnabled).ToList()
+
+        If MipMapEnabled Then
             For i = 0 To MipCount - 2
                 CurrentBytes = HalveArray(CurrentBytes, CurrentW, CurrentH)
                 CurrentW = Math.Max(1, CurrentW >> 1)
                 CurrentH = Math.Max(1, CurrentH >> 1)
-                PayloadBytes.AddRange(GetImageData(CurrentBytes, CurrentW, CurrentH, Alpha, Compress, HighQuality))
+                PayloadBytes.AddRange(GetImageData(CurrentBytes, CurrentW, CurrentH, AlphaMode, CompressionEnabled, HighQualityEnabled))
             Next
         End If
 
@@ -372,6 +399,7 @@ Public Class DDS_Encoder
     End Function
 
     Public Sub SaveImage(FilePath As String)
+        BeginEncode()
         Dim FileBytes As New List(Of Byte)
         FileBytes.AddRange(HeaderBytes)
         FileBytes.AddRange(PayloadBytes)

@@ -14,7 +14,7 @@ Public Class DDS_Decoder
 
     Public Signature As String
     Public HeaderSize As Integer
-    Private SurfaceFlags As DDS_SurfaceFlags
+    Public SurfaceFlags As DDS_SurfaceFlags
     Public Height As Integer
     Public Width As Integer
     Public PitchLinearSize As Integer
@@ -22,7 +22,7 @@ Public Class DDS_Decoder
     Public MipMapCount As Integer
 
     Public SubHeaderSize As Integer
-    Private PixelFlags As DDS_PixelFlags
+    Public PixelFlags As DDS_PixelFlags
     Public FourCC As String
     Public RGBBitCount As Integer
 
@@ -31,16 +31,16 @@ Public Class DDS_Decoder
     Public BlueBitMask As Integer
     Public AlphaBitMask As Integer
 
-    Private Caps1 As DDS_Caps1
+    Public Caps1 As DDS_Caps1
     Public Caps2 As Integer
 
     Public ExtendedHeader As Boolean
 
-    Private DXGIFormat As DXGI_Format
-    Private ResourceDimension As DX10_ResourceDimension
-    Private MiscFlag As DX10_MiscFlags
-    Private ArraySize As Integer
-    Private MiscFlags2 As DX10_AlphaMode
+    Public DXGIFormat As DXGI_Format
+    Public ResourceDimension As DX10_ResourceDimension
+    Public MiscFlag As DX10_MiscFlags
+    Public ArraySize As Integer
+    Public MiscFlags2 As DX10_AlphaMode
 
     Private SourceBytes As Byte()
     Private DecodedBytes As Byte()
@@ -95,6 +95,7 @@ Public Class DDS_Decoder
 
             End Using
         End Using
+
     End Sub
 
     Private Sub BeginDecode()
