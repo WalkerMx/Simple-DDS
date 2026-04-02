@@ -1,6 +1,6 @@
-# Managed DDS Encoder (VB.NET)
+# Managed DDS Encoder/Decoder (VB.NET)
 
-A lightweight, standalone, and high-performance DDS (DirectDraw Surface) encoder for .NET. It is portable and has has zero dependancies, so you can create textures without installing huge C++ SDKs or DirectX libraries.
+A lightweight, standalone, and high-performance DDS (DirectDraw Surface) encoder and decoder for .NET. It is portable and has has zero dependancies, so you can create textures without installing huge C++ SDKs or DirectX libraries.
 
 ## Features
 
@@ -18,30 +18,32 @@ A lightweight, standalone, and high-performance DDS (DirectDraw Surface) encoder
 
 ## Compression Quality Levels
 
-This library implements two distinct encoding strategies to balance iteration speed with final visual fidelity.
-
 | Feature | **Fast Mode** | **High Quality Mode** |
 | :--- | :--- | :--- |
-| **Algorithm** | Bounding Box (Extrema) | Weighted Least Squares |
+| **Algorithm** | Bounding Box | Weighted Least Squares |
 | **Metric** | Simple Midpoint | Euclidean Distance Squared |
 | **Perceptual** | Numerical Min/Max | Luminance Weighted (G > R > B) |
 | **Speed** | Instant (<40ms for 1MP) | ~9x slower (~280ms for 1MP) |
 
-### High Quality Mode Details
-The "High Quality" preset uses a **Weighted Least Squares** approach. It selects block endpoints based on perceived luminance and then performs a mathematical nearest-neighbor search for every pixel. This significantly reduces color-shifting and banding artifacts common in simpler encoders.
-
 ---
 
-## Usage
+## Usage Examples
 
-Integrating the encoder is dead-simple. Simply add the `DDS.vb` class to your project and call it as follows:
-
+Turn any standard image into a compressed DDS file:
 ```vbnet
 Using SourceImage As Image = Image.FromFile("texture.png")
 
-    ' Parameters: Image, AlphaMode (0-2), Compress (True/False), MipMaps, ExtendedHeader, HighQuality
+    ' Parameters: Image, AlphaMode (0 - Opaque DXT1, 1 - 1-bit DXT1, 2 - 8-bit DXT5), Compress (T/F), Mips (T/F), DX10 (T/F), HighQuality (T/F)
     Using MyDDS As New DDS(SourceImage, 2, True, True, False, True)
         MyDDS.SaveImage("output.dds")
     End Using
 
 End Using
+```
+
+Read a DDS file and convert it back to a standard .NET Bitmap for display or conversion:
+```vbnet
+Using Decoder As New DDS_Decoder("input.dds")
+    Decoder.SaveImage("output.png", Imaging.ImageFormat.Png)
+End Using
+```
