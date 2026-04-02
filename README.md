@@ -33,8 +33,7 @@ Turn any standard image into a compressed DDS file:
 ```vbnet
 Using SourceImage As Image = Image.FromFile("texture.png")
 
-    ' Parameters: Image, AlphaMode (0 - Opaque DXT1, 1 - 1-bit DXT1, 2 - 8-bit DXT5), Compress (T/F), Mips (T/F), DX10 (T/F), HighQuality (T/F)
-    Using MyDDS As New DDS(SourceImage, 2, True, True, False, True)
+    Using MyDDS As New DDS(SourceImage, 2, True, False, True, True)
         MyDDS.SaveImage("output.dds")
     End Using
 
