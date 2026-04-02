@@ -13,58 +13,6 @@ Public Class DDS_Encoder
     Private HeaderBytes As New List(Of Byte)
     Private PayloadBytes As New List(Of Byte)
 
-    Private Enum SurfaceFlags
-        DDSD_CAPS = &H1
-        DDSD_HEIGHT = &H2
-        DDSD_WIDTH = &H4
-        DDSD_PITCH = &H8
-        DDSD_PIXELFORMAT = &H1000
-        DDSD_MIPMAPCOUNT = &H20000
-        DDSD_LINEARSIZE = &H80000
-        DDSD_DEPTH = &H800000
-    End Enum
-
-    Private Enum PixelFlags
-        DDPF_ALPHAPIXELS = &H1
-        DDPF_FOURCC = &H4
-        DDPF_RGB = &H40
-    End Enum
-
-    Private Enum Caps1
-        DDSCAPS_COMPLEX = &H8
-        DDSCAPS_TEXTURE = &H1000
-        DDSCAPS_MIPMAP = &H400000
-    End Enum
-
-    Private Enum DXGI_Format
-        DXGI_FORMAT_UNKNOWN = &H0
-        DXGI_FORMAT_BC1_UNORM = &H47
-        DXGI_FORMAT_BC3_UNORM = &H4D
-        DXGI_FORMAT_B8G8R8A8_UNORM = &H57
-        DXGI_FORMAT_B8G8R8X8_UNORM = &H58
-    End Enum
-
-    Private Enum DX10_ResourceDimension As Integer
-        D3D10_RESOURCE_DIMENSION_UNKNOWN = &H0
-        D3D10_RESOURCE_DIMENSION_BUFFER = &H1
-        D3D10_RESOURCE_DIMENSION_TEXTURE1D = &H2
-        D3D10_RESOURCE_DIMENSION_TEXTURE2D = &H3
-        D3D10_RESOURCE_DIMENSION_TEXTURE3D = &H4
-    End Enum
-
-    Private Enum DX10_MiscFlags As Integer
-        D3D10_RESOURCE_MISC_NONE = &H0
-        D3D10_RESOURCE_MISC_TEXTURECUBE = &H4
-    End Enum
-
-    Private Enum DX10_AlphaMode As Integer
-        DDS_ALPHA_MODE_UNKNOWN = &H0
-        DDS_ALPHA_MODE_STRAIGHT = &H1
-        DDS_ALPHA_MODE_PREMULTIPLIED = &H2
-        DDS_ALPHA_MODE_OPAQUE = &H3
-        DDS_ALPHA_MODE_CUSTOM = &H4
-    End Enum
-
     ''' <summary>
     ''' Creates a DDS Image from a standard Image file.
     ''' </summary>
@@ -76,14 +24,14 @@ Public Class DDS_Encoder
     ''' <param name="HighQuality">Use advanced proccessing for compressing blocks at the cost speed.</param>
     Public Sub New(SourceImage As Image, Alpha As Integer, Compress As Boolean, MipMaps As Boolean, ExtendedHeader As Boolean, Optional HighQuality As Boolean = True)
 
-        Dim DDS_SurfaceFlags As New List(Of SurfaceFlags)
-        Dim DDS_PixelFlags As New List(Of PixelFlags)
-        Dim DDS_Caps1 As New List(Of Caps1)
-        Dim DDS_DXGIFormat As New DXGI_Format
-        Dim DDS_ResourceDimension As DX10_ResourceDimension = DX10_ResourceDimension.D3D10_RESOURCE_DIMENSION_TEXTURE2D
-        Dim DDS_MiscFlag As DX10_MiscFlags = DX10_MiscFlags.D3D10_RESOURCE_MISC_NONE
-        Dim DDS_MiscFlag2 As New DX10_AlphaMode
-        Dim DDS_RGBBitCount As Integer = 32
+        Dim SurfaceFlags As New DDS_SurfaceFlags
+        Dim PixelFlags As DDS_PixelFlags
+        Dim Caps1 As New DDS_Caps1
+        Dim DXGIFormat As New DXGI_Format
+        Dim ResourceDimension As DX10_ResourceDimension = DX10_ResourceDimension.D3D10_RESOURCE_DIMENSION_TEXTURE2D
+        Dim MiscFlag As DX10_MiscFlags = DX10_MiscFlags.D3D10_RESOURCE_MISC_NONE
+        Dim MiscFlag2 As New DX10_AlphaMode
+        Dim RGBBitCount As Integer = 32
         Dim PLS As Integer
         Dim FourCC As String = "DXT1"
         Dim BytesPerBlock As Integer = 8
@@ -93,20 +41,20 @@ Public Class DDS_Encoder
         Dim BMask As Byte() = {&HFF, 0, 0, 0}
         Dim AMask As Byte() = {0, 0, 0, &HFF}
 
-        DDS_SurfaceFlags.AddRange({SurfaceFlags.DDSD_CAPS, SurfaceFlags.DDSD_PIXELFORMAT, SurfaceFlags.DDSD_WIDTH, SurfaceFlags.DDSD_HEIGHT})
-        DDS_Caps1.Add(Caps1.DDSCAPS_TEXTURE)
+        SurfaceFlags = DDS_SurfaceFlags.DDSD_CAPS Or DDS_SurfaceFlags.DDSD_PIXELFORMAT Or DDS_SurfaceFlags.DDSD_WIDTH Or DDS_SurfaceFlags.DDSD_HEIGHT
+        Caps1 = DDS_Caps1.DDSCAPS_TEXTURE
 
         If MipMaps Then MipCount = CalcMips(SourceImage.Width, SourceImage.Height)
 
         If Alpha > 0 Then
-            DDS_PixelFlags.Add(PixelFlags.DDPF_ALPHAPIXELS)
+            PixelFlags = PixelFlags Or DDS_PixelFlags.DDPF_ALPHAPIXELS
         Else
             AMask = {0, 0, 0, 0}
         End If
 
         If Compress = True Then
-            DDS_SurfaceFlags.Add(SurfaceFlags.DDSD_LINEARSIZE)
-            DDS_PixelFlags.Add(PixelFlags.DDPF_FOURCC)
+            SurfaceFlags = SurfaceFlags Or DDS_SurfaceFlags.DDSD_LINEARSIZE
+            PixelFlags = PixelFlags Or DDS_PixelFlags.DDPF_FOURCC
             If Alpha = 2 Then
                 FourCC = "DXT5"
                 BytesPerBlock = 16
@@ -118,15 +66,15 @@ Public Class DDS_Encoder
             AMask = {0, 0, 0, 0}
         Else
             FourCC = ""
-            DDS_SurfaceFlags.Add(SurfaceFlags.DDSD_PITCH)
-            DDS_PixelFlags.Add(PixelFlags.DDPF_RGB)
+            SurfaceFlags = SurfaceFlags Or DDS_SurfaceFlags.DDSD_PITCH
+            PixelFlags = PixelFlags Or DDS_PixelFlags.DDPF_RGB
             PLS = SourceImage.Width * 4
         End If
 
         If MipMaps Then
-            DDS_SurfaceFlags.Add(SurfaceFlags.DDSD_MIPMAPCOUNT)
-            DDS_Caps1.Add(Caps1.DDSCAPS_COMPLEX)
-            DDS_Caps1.Add(Caps1.DDSCAPS_MIPMAP)
+            SurfaceFlags = SurfaceFlags Or DDS_SurfaceFlags.DDSD_MIPMAPCOUNT
+            Caps1 = Caps1 Or DDS_Caps1.DDSCAPS_COMPLEX
+            Caps1 = Caps1 Or DDS_Caps1.DDSCAPS_MIPMAP
         End If
 
         If ExtendedHeader = True Then
@@ -135,33 +83,32 @@ Public Class DDS_Encoder
             GMask = {0, 0, 0, 0}
             BMask = {0, 0, 0, 0}
             AMask = {0, 0, 0, 0}
-            DDS_PixelFlags.Clear()
-            DDS_PixelFlags.Add(PixelFlags.DDPF_FOURCC)
-            DDS_RGBBitCount = 0
+            PixelFlags = DDS_PixelFlags.DDPF_FOURCC
+            RGBBitCount = 0
             Select Case Alpha
                 Case 0
                     If Compress Then
-                        DDS_DXGIFormat = DXGI_Format.DXGI_FORMAT_BC1_UNORM
+                        DXGIFormat = DXGI_Format.DXGI_FORMAT_BC1_UNORM
                     Else
-                        DDS_DXGIFormat = DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM
+                        DXGIFormat = DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM
                     End If
-                    DDS_MiscFlag2 = DX10_AlphaMode.DDS_ALPHA_MODE_OPAQUE
+                    MiscFlag2 = DX10_AlphaMode.DDS_ALPHA_MODE_OPAQUE
                 Case 1
-                    DDS_DXGIFormat = DXGI_Format.DXGI_FORMAT_BC1_UNORM
-                    DDS_MiscFlag2 = DX10_AlphaMode.DDS_ALPHA_MODE_STRAIGHT
+                    DXGIFormat = DXGI_Format.DXGI_FORMAT_BC1_UNORM
+                    MiscFlag2 = DX10_AlphaMode.DDS_ALPHA_MODE_STRAIGHT
                 Case 2
                     If Compress Then
-                        DDS_DXGIFormat = DXGI_Format.DXGI_FORMAT_BC3_UNORM
+                        DXGIFormat = DXGI_Format.DXGI_FORMAT_BC3_UNORM
                     Else
-                        DDS_DXGIFormat = DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM
+                        DXGIFormat = DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM
                     End If
-                    DDS_MiscFlag2 = DX10_AlphaMode.DDS_ALPHA_MODE_STRAIGHT
+                    MiscFlag2 = DX10_AlphaMode.DDS_ALPHA_MODE_STRAIGHT
             End Select
         End If
 
         HeaderBytes.AddRange(OrderBytes("DDS "))                                ' dwMagic
         HeaderBytes.AddRange(OrderBytes(124))                                   ' dwSize
-        HeaderBytes.AddRange(OrderBytes(DDS_SurfaceFlags.ToArray))              ' dwFlags
+        HeaderBytes.AddRange(OrderBytes(SurfaceFlags))                          ' dwFlags
         HeaderBytes.AddRange(OrderBytes(SourceImage.Height))                    ' dwHeight
         HeaderBytes.AddRange(OrderBytes(SourceImage.Width))                     ' dwWidth
         HeaderBytes.AddRange(OrderBytes(PLS))                                   ' dwPitchOrLinearSize
@@ -173,29 +120,29 @@ Public Class DDS_Encoder
         Next
 
         HeaderBytes.AddRange(OrderBytes(32))                                    ' DDPIXELFORMAT dwSize
-        HeaderBytes.AddRange(OrderBytes(DDS_PixelFlags.ToArray))                ' DDPIXELFORMAT dwFlags
+        HeaderBytes.AddRange(OrderBytes(PixelFlags))                            ' DDPIXELFORMAT dwFlags
         HeaderBytes.AddRange(OrderBytes(FourCC))                                ' DDPIXELFORMAT dwFourCC
-        HeaderBytes.AddRange(OrderBytes(DDS_RGBBitCount))                       ' DDPIXELFORMAT dwRGBBitCount
+        HeaderBytes.AddRange(OrderBytes(RGBBitCount))                           ' DDPIXELFORMAT dwRGBBitCount
         HeaderBytes.AddRange(RMask)                                             ' DDPIXELFORMAT dwRBitMask
         HeaderBytes.AddRange(GMask)                                             ' DDPIXELFORMAT dwGBitMask
         HeaderBytes.AddRange(BMask)                                             ' DDPIXELFORMAT dwBBitMask
         HeaderBytes.AddRange(AMask)                                             ' DDPIXELFORMAT dwABitMask
 
-        HeaderBytes.AddRange(OrderBytes(DDS_Caps1.ToArray))                     ' DDCAPS2 dwCaps1
+        HeaderBytes.AddRange(OrderBytes(Caps1))                                 ' DDCAPS2 dwCaps1
         HeaderBytes.AddRange(OrderBytes(0))                                     ' DDCAPS2 dwCaps2 (Unused)
 
         For i = 0 To 1
-            HeaderBytes.AddRange(OrderBytes(0))                                 ' DDCAPS2 Reserved x 2
+            HeaderBytes.AddRange(OrderBytes(0))                                 ' DDCAPS2 dwCaps3, dwCaps4
         Next
 
         HeaderBytes.AddRange(OrderBytes(0))                                     ' dwReserved2
 
         If ExtendedHeader Then
-            HeaderBytes.AddRange(OrderBytes(DDS_DXGIFormat))                    ' dwDxgiFormat
-            HeaderBytes.AddRange(OrderBytes(DDS_ResourceDimension))             ' dwResourceDimension
-            HeaderBytes.AddRange(OrderBytes(DDS_MiscFlag))                      ' dwMiscFlag
+            HeaderBytes.AddRange(OrderBytes(DXGIFormat))                        ' dwDxgiFormat
+            HeaderBytes.AddRange(OrderBytes(ResourceDimension))                 ' dwResourceDimension
+            HeaderBytes.AddRange(OrderBytes(MiscFlag))                          ' dwMiscFlag
             HeaderBytes.AddRange(OrderBytes(1))                                 ' dwArraySize
-            HeaderBytes.AddRange(OrderBytes(DDS_MiscFlag2))                     ' dwMiscFlags2
+            HeaderBytes.AddRange(OrderBytes(MiscFlag2))                         ' dwMiscFlags2
         End If
 
         Dim CurrentW As Integer = SourceImage.Width
@@ -471,14 +418,6 @@ Public Class DDS_Encoder
         Return DestData
     End Function
 
-    Private Function OrderBytes(Source As Integer()) As Byte()
-        Dim Result As Integer = 0
-        For Each f In Source
-            Result = Result Or f
-        Next
-        Return BitConverter.GetBytes(Result)
-    End Function
-
     Private Function OrderBytes(Source As Integer) As Byte()
         Return BitConverter.GetBytes(Source)
     End Function
@@ -491,16 +430,6 @@ Public Class DDS_Encoder
         End If
         Return Bytes
     End Function
-
-    Private Function Clamp(Value As Integer, MinValue As Integer, MaxValue As Integer) As Integer
-        Return Math.Max(MinValue, Math.Min(Value, MaxValue))
-    End Function
-
-    Private Sub Swap(Of T)(ByRef Value1 As T, ByRef Value2 As T)
-        Dim Temp As T = Value1
-        Value1 = Value2
-        Value2 = Temp
-    End Sub
 
     Protected Overridable Sub Dispose(Disposing As Boolean)
         If Not Disposed Then
