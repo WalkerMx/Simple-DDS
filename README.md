@@ -12,8 +12,6 @@ A lightweight, fully managed DDS encoder and decoder. This library provides a ze
 * **Mipmaps:** Automated chain generation using box-filter downsampling.
 * **Headers:** Supports Legacy FourCC and modern **DX10 (DXGI_Format)** extended headers.
 
----
-
 ## Usage Examples
 
 ### Encoding
