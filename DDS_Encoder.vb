@@ -1,7 +1,9 @@
 ﻿' DDS Encoder Class by WalkerMx
 ' Based on the documentation found here:
 ' http://doc.51windows.net/directx9_sdk/graphics/reference/DDSFileReference/ddsfileformat.htm
+' https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds
 
+Imports System.IO
 Imports System.Drawing.Imaging
 Imports System.Runtime.InteropServices
 
@@ -21,8 +23,8 @@ Public Class DDS_Encoder
 
     Private MipCount As Integer
 
-    Private HeaderBytes As New List(Of Byte)
-    Private PayloadBytes As New List(Of Byte)
+    Private HeaderBytes As Byte()
+    Private PayloadBytes As Byte()
 
     ''' <summary>
     ''' Creates a DDS Image from a standard Image file.
@@ -56,6 +58,8 @@ Public Class DDS_Encoder
         MipMapEnabled = MipMaps
         CompressionEnabled = Compress
         HighQualityEnabled = HighQuality
+
+        HeaderBytes = New Byte(127) {}
 
         Using TempImage As Image = Image.FromFile(Source)
             Width = TempImage.Width
@@ -104,6 +108,7 @@ Public Class DDS_Encoder
             GMask = {0, 0, 0, 0}
             BMask = {0, 0, 0, 0}
             AMask = {0, 0, 0, 0}
+            HeaderBytes = New Byte(147) {}
             PixelFlags = DDS_PixelFlags.DDPF_FOURCC
             RGBBitCount = 0
             Select Case Alpha
@@ -127,44 +132,42 @@ Public Class DDS_Encoder
             End Select
         End If
 
-        HeaderBytes.AddRange(OrderBytes("DDS "))                                ' dwMagic
-        HeaderBytes.AddRange(OrderBytes(124))                                   ' dwSize
-        HeaderBytes.AddRange(OrderBytes(SurfaceFlags))                          ' dwFlags
-        HeaderBytes.AddRange(OrderBytes(Height))                                ' dwHeight
-        HeaderBytes.AddRange(OrderBytes(Width))                                 ' dwWidth
-        HeaderBytes.AddRange(OrderBytes(PLS))                                   ' dwPitchOrLinearSize
-        HeaderBytes.AddRange(OrderBytes(0))                                     ' dwDepth
-        HeaderBytes.AddRange(OrderBytes(MipCount))                              ' dwMipMapCount
+        Using HeaderStream As New MemoryStream(HeaderBytes)
 
-        For i = 0 To 10
-            HeaderBytes.AddRange(OrderBytes(0))                                 ' dwReserved1 x 11
-        Next
+            HeaderStream.Write(OrderBytes("DDS "), 0, 4)                    ' dwMagic
+            HeaderStream.Write(OrderBytes(124), 0, 4)                       ' dwSize
+            HeaderStream.Write(OrderBytes(SurfaceFlags), 0, 4)              ' dwFlags
+            HeaderStream.Write(OrderBytes(Height), 0, 4)                    ' dwHeight
+            HeaderStream.Write(OrderBytes(Width), 0, 4)                     ' dwWidth
+            HeaderStream.Write(OrderBytes(PLS), 0, 4)                       ' dwPitchOrLinearSize
+            HeaderStream.Write(OrderBytes(0), 0, 4)                         ' dwDepth
+            HeaderStream.Write(OrderBytes(MipCount), 0, 4)                  ' dwMipMapCount
 
-        HeaderBytes.AddRange(OrderBytes(32))                                    ' DDPIXELFORMAT dwSize
-        HeaderBytes.AddRange(OrderBytes(PixelFlags))                            ' DDPIXELFORMAT dwFlags
-        HeaderBytes.AddRange(OrderBytes(FourCC))                                ' DDPIXELFORMAT dwFourCC
-        HeaderBytes.AddRange(OrderBytes(RGBBitCount))                           ' DDPIXELFORMAT dwRGBBitCount
-        HeaderBytes.AddRange(RMask)                                             ' DDPIXELFORMAT dwRBitMask
-        HeaderBytes.AddRange(GMask)                                             ' DDPIXELFORMAT dwGBitMask
-        HeaderBytes.AddRange(BMask)                                             ' DDPIXELFORMAT dwBBitMask
-        HeaderBytes.AddRange(AMask)                                             ' DDPIXELFORMAT dwABitMask
+            HeaderStream.Seek(44, SeekOrigin.Current)                       ' dwReserved1 x11
 
-        HeaderBytes.AddRange(OrderBytes(Caps1))                                 ' DDCAPS2 dwCaps1
-        HeaderBytes.AddRange(OrderBytes(0))                                     ' DDCAPS2 dwCaps2 (Unused)
+            HeaderStream.Write(OrderBytes(32), 0, 4)                        ' DDPIXELFORMAT dwSize
+            HeaderStream.Write(OrderBytes(PixelFlags), 0, 4)                ' DDPIXELFORMAT dwFlags
+            HeaderStream.Write(OrderBytes(FourCC), 0, 4)                    ' DDPIXELFORMAT dwFourCC
+            HeaderStream.Write(OrderBytes(RGBBitCount), 0, 4)               ' DDPIXELFORMAT dwRGBBitCount
+            HeaderStream.Write(RMask, 0, 4)                                 ' DDPIXELFORMAT dwRBitMask
+            HeaderStream.Write(GMask, 0, 4)                                 ' DDPIXELFORMAT dwGBitMask
+            HeaderStream.Write(BMask, 0, 4)                                 ' DDPIXELFORMAT dwBBitMask
+            HeaderStream.Write(AMask, 0, 4)                                 ' DDPIXELFORMAT dwABitMask
 
-        For i = 0 To 1
-            HeaderBytes.AddRange(OrderBytes(0))                                 ' DDCAPS2 dwCaps3, dwCaps4
-        Next
+            HeaderStream.Write(OrderBytes(Caps1), 0, 4)                     ' dwCaps1
+            HeaderStream.Write(OrderBytes(0), 0, 4)                         ' dwCaps2
 
-        HeaderBytes.AddRange(OrderBytes(0))                                     ' dwReserved2
+            HeaderStream.Seek(12, SeekOrigin.Current)                       ' dwCaps3, dwCaps4, dwReserved2
 
-        If ExtendedHeader Then
-            HeaderBytes.AddRange(OrderBytes(DXGIFormat))                        ' dwDxgiFormat
-            HeaderBytes.AddRange(OrderBytes(ResourceDimension))                 ' dwResourceDimension
-            HeaderBytes.AddRange(OrderBytes(MiscFlag))                          ' dwMiscFlag
-            HeaderBytes.AddRange(OrderBytes(1))                                 ' dwArraySize
-            HeaderBytes.AddRange(OrderBytes(MiscFlag2))                         ' dwMiscFlags2
-        End If
+            If ExtendedHeader Then
+                HeaderStream.Write(OrderBytes(DXGIFormat), 0, 4)            ' dwDxgiFormat
+                HeaderStream.Write(OrderBytes(ResourceDimension), 0, 4)     ' dwResourceDimension
+                HeaderStream.Write(OrderBytes(MiscFlag), 0, 4)              ' dwMiscFlag
+                HeaderStream.Write(OrderBytes(1), 0, 4)                     ' dwArraySize
+                HeaderStream.Write(OrderBytes(MiscFlag2), 0, 4)             ' dwMiscFlags2
+            End If
+
+        End Using
 
     End Sub
 
@@ -174,20 +177,31 @@ Public Class DDS_Encoder
         Dim CurrentH As Integer = Height
         Dim CurrentBytes As Byte()
 
-        Using TempImage As Image = Image.FromFile(SourcePath)
-            CurrentBytes = ExtractBitmapBytes(TempImage)
+        Using PayloadStream As New MemoryStream()
+
+            PayloadStream.Write(HeaderBytes, 0, HeaderBytes.Count)
+
+            Using TempImage As Image = Image.FromFile(SourcePath)
+                CurrentBytes = ExtractBitmapBytes(TempImage)
+            End Using
+
+            Dim TempBytes As Byte() = GetImageData(CurrentBytes, CurrentW, CurrentH, AlphaMode, CompressionEnabled, HighQualityEnabled)
+
+            PayloadStream.Write(TempBytes, 0, TempBytes.Count)
+
+            If MipMapEnabled Then
+                For i = 0 To MipCount - 2
+                    CurrentBytes = HalveArray(CurrentBytes, CurrentW, CurrentH)
+                    CurrentW = Math.Max(1, CurrentW >> 1)
+                    CurrentH = Math.Max(1, CurrentH >> 1)
+                    TempBytes = GetImageData(CurrentBytes, CurrentW, CurrentH, AlphaMode, CompressionEnabled, HighQualityEnabled)
+                    PayloadStream.Write(TempBytes, 0, TempBytes.Count)
+                Next
+            End If
+
+            PayloadBytes = PayloadStream.ToArray
+
         End Using
-
-        PayloadBytes = GetImageData(CurrentBytes, CurrentW, CurrentH, AlphaMode, CompressionEnabled, HighQualityEnabled).ToList()
-
-        If MipMapEnabled Then
-            For i = 0 To MipCount - 2
-                CurrentBytes = HalveArray(CurrentBytes, CurrentW, CurrentH)
-                CurrentW = Math.Max(1, CurrentW >> 1)
-                CurrentH = Math.Max(1, CurrentH >> 1)
-                PayloadBytes.AddRange(GetImageData(CurrentBytes, CurrentW, CurrentH, AlphaMode, CompressionEnabled, HighQualityEnabled))
-            Next
-        End If
 
     End Sub
 
@@ -232,8 +246,8 @@ Public Class DDS_Encoder
                                                  Dim rowOutputOffset As Integer = yBlock * BlocksWide * BytesPerBlock
                                                  For xBlock As Integer = 0 To BlocksWide - 1
                                                      Dim xPixelBase As Integer = xBlock * 4
-                                                     Dim BlockColors(15) As UShort
-                                                     Dim BlockAlphas(15) As Byte
+                                                     Dim BlockColors As UShort() = New UShort(15) {}
+                                                     Dim BlockAlphas As Byte() = New Byte(15) {}
                                                      For j As Integer = 0 To 3
                                                          Dim py As Integer = Math.Min(yPixelBase + j, Height - 1)
                                                          Dim rowInputOffset As Integer = py * Width * 4
@@ -306,8 +320,12 @@ Public Class DDS_Encoder
         Dim Col0 As UShort
         Dim Col1 As UShort
         If HighQuality = False Then
-            Col0 = PixelArray.Max()
-            Col1 = PixelArray.Min()
+            Col0 = 0
+            Col1 = 255
+            For i = 0 To PixelArray.Count - 1
+                If PixelArray(i) > Col0 Then Col0 = PixelArray(i)
+                If PixelArray(i) < Col1 Then Col1 = PixelArray(i)
+            Next
         Else
             Dim Lum0 As Double = -1
             Dim Lum1 As Double = 1000
@@ -384,7 +402,10 @@ Public Class DDS_Encoder
                     Dim MinError As Long = Long.MaxValue
                     Dim Count As Integer = If(ForceOpaque, 3, 2)
                     For k As Integer = 0 To Count
-                        Dim Distance As Long = CLng(PixelR - C(k, 0)) ^ 2 + CLng(PixelG - C(k, 1)) ^ 2 + CLng(PixelB - C(k, 2)) ^ 2
+                        Dim dR As Long = CLng(PixelR - C(k, 0))
+                        Dim dG As Long = CLng(PixelG - C(k, 1))
+                        Dim dB As Long = CLng(PixelB - C(k, 2))
+                        Dim Distance As Long = (dR * dR) + (dG * dG) + (dB * dB)
                         If Distance < MinError Then
                             MinError = Distance
                             Index = CByte(k)
@@ -400,10 +421,7 @@ Public Class DDS_Encoder
 
     Public Sub SaveImage(FilePath As String)
         BeginEncode()
-        Dim FileBytes As New List(Of Byte)
-        FileBytes.AddRange(HeaderBytes)
-        FileBytes.AddRange(PayloadBytes)
-        IO.File.WriteAllBytes(FilePath, FileBytes.ToArray)
+        File.WriteAllBytes(FilePath, PayloadBytes)
     End Sub
 
     Private Function CalcMips(Width As Integer, Height As Integer) As Integer
@@ -435,10 +453,7 @@ Public Class DDS_Encoder
                 Dim x1 As Integer = Math.Min((x << 1) + 1, Width - 1) * 4
                 Dim destPixelOffset As Integer = destRowOffset + (x * 4)
                 For c As Integer = 0 To 3
-                    Dim sum As Integer = CInt(SourceData(srcY0 + x0 + c)) +
-                                     SourceData(srcY0 + x1 + c) +
-                                     SourceData(srcY1 + x0 + c) +
-                                     SourceData(srcY1 + x1 + c)
+                    Dim sum As Integer = CInt(SourceData(srcY0 + x0 + c)) + SourceData(srcY0 + x1 + c) + SourceData(srcY1 + x0 + c) + SourceData(srcY1 + x1 + c)
                     DestData(destPixelOffset + c) = CByte(sum >> 2)
                 Next
             Next

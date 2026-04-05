@@ -1,6 +1,7 @@
 ﻿' DDS Decoder Class by WalkerMx
 ' Based on the documentation found here:
 ' http://doc.51windows.net/directx9_sdk/graphics/reference/DDSFileReference/ddsfileformat.htm
+' https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds
 
 Imports System.IO
 Imports System.Drawing.Imaging
@@ -55,38 +56,38 @@ Public Class DDS_Decoder
         Using FS As New FileStream(Source, FileMode.Open, FileAccess.Read)
             Using Reader As New BinaryReader(FS)
 
-                Signature = New String(Reader.ReadChars(4))             ' dwMagic (4 bytes)
-                HeaderSize = Reader.ReadInt32()                         ' dwSize (4 bytes)
-                SurfaceFlags = Reader.ReadInt32()                       ' dwFlags (4 bytes)
-                Height = Reader.ReadInt32()                             ' dwHeight (4 bytes)
-                Width = Reader.ReadInt32()                              ' dwWidth (4 bytes)
-                PitchLinearSize = Reader.ReadInt32()                    ' dwPitchOrLinearSize (4 bytes)
-                Depth = Reader.ReadInt32()                              ' dwDepth (4 bytes)
-                MipMapCount = Reader.ReadInt32()                        ' dwMipMapCount (4 bytes)
+                Signature = New String(Reader.ReadChars(4))             ' dwMagic
+                HeaderSize = Reader.ReadInt32()                         ' dwSize
+                SurfaceFlags = Reader.ReadInt32()                       ' dwFlags
+                Height = Reader.ReadInt32()                             ' dwHeight
+                Width = Reader.ReadInt32()                              ' dwWidth
+                PitchLinearSize = Reader.ReadInt32()                    ' dwPitchOrLinearSize
+                Depth = Reader.ReadInt32()                              ' dwDepth
+                MipMapCount = Reader.ReadInt32()                        ' dwMipMapCount
 
-                Reader.BaseStream.Seek(44, SeekOrigin.Current)          ' dwReserved1[11]
+                Reader.BaseStream.Seek(44, SeekOrigin.Current)          ' dwReserved1 x11
 
-                SubHeaderSize = Reader.ReadInt32()                      ' DDPIXELFORMAT dwSize (4 bytes)
-                PixelFlags = Reader.ReadInt32()                         ' DDPIXELFORMAT dwFlags (4 bytes)
-                FourCC = New String(Reader.ReadChars(4))                ' DDPIXELFORMAT dwFourCC (4 bytes)
-                RGBBitCount = Reader.ReadInt32()                        ' DDPIXELFORMAT dwRGBBitCount (4 bytes)
-                RedBitMask = Reader.ReadInt32()                         ' DDPIXELFORMAT dwRBitMask (4 bytes)
-                GreenBitMask = Reader.ReadInt32()                       ' DDPIXELFORMAT dwGBitMask (4 bytes)
-                BlueBitMask = Reader.ReadInt32()                        ' DDPIXELFORMAT dwBBitMask (4 bytes)
-                AlphaBitMask = Reader.ReadInt32()                       ' DDPIXELFORMAT dwABitMask (4 bytes)
+                SubHeaderSize = Reader.ReadInt32()                      ' DDPIXELFORMAT dwSize
+                PixelFlags = Reader.ReadInt32()                         ' DDPIXELFORMAT dwFlags
+                FourCC = New String(Reader.ReadChars(4))                ' DDPIXELFORMAT dwFourCC
+                RGBBitCount = Reader.ReadInt32()                        ' DDPIXELFORMAT dwRGBBitCount
+                RedBitMask = Reader.ReadInt32()                         ' DDPIXELFORMAT dwRBitMask
+                GreenBitMask = Reader.ReadInt32()                       ' DDPIXELFORMAT dwGBitMask
+                BlueBitMask = Reader.ReadInt32()                        ' DDPIXELFORMAT dwBBitMask
+                AlphaBitMask = Reader.ReadInt32()                       ' DDPIXELFORMAT dwABitMask
 
-                Caps1 = Reader.ReadInt32()                              ' dwCaps (4 bytes)
-                Caps2 = Reader.ReadInt32()                              ' dwCaps2 (4 bytes)
+                Caps1 = Reader.ReadInt32()                              ' dwCaps
+                Caps2 = Reader.ReadInt32()                              ' dwCaps2
 
                 Reader.BaseStream.Seek(12, SeekOrigin.Current)          ' dwCaps3, dwCaps4, dwReserved2
 
                 If FourCC = "DX10" Then
                     ExtendedHeader = True
-                    DXGIFormat = Reader.ReadInt32()                     ' dxgiFormat (4 bytes)
-                    ResourceDimension = Reader.ReadInt32()              ' resourceDimension (4 bytes)
-                    MiscFlag = Reader.ReadInt32()                       ' miscFlag (4 bytes)
-                    ArraySize = Reader.ReadInt32()                      ' arraySize (4 bytes)
-                    MiscFlags2 = Reader.ReadInt32()                     ' miscFlags2 (4 bytes)
+                    DXGIFormat = Reader.ReadInt32()                     ' dxgiFormat
+                    ResourceDimension = Reader.ReadInt32()              ' resourceDimension
+                    MiscFlag = Reader.ReadInt32()                       ' miscFlag
+                    ArraySize = Reader.ReadInt32()                      ' arraySize
+                    MiscFlags2 = Reader.ReadInt32()                     ' miscFlags2
                     Select Case DXGIFormat
                         Case DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM : SetMask(2, 1, 0, 3) : RGBBitCount = 32
                         Case DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM : SetMask(2, 1, 0) : RGBBitCount = 32

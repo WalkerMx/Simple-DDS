@@ -1,6 +1,7 @@
 ﻿' DDS Common Class by WalkerMx
 ' Based on the documentation found here:
 ' http://doc.51windows.net/directx9_sdk/graphics/reference/DDSFileReference/ddsfileformat.htm
+' https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds
 
 Public Module DDS_Common
 
