@@ -49,7 +49,6 @@ Public Class DDS_Decoder
     Public Sub New(Source As String)
         FilePath = Source
         ReadHeader(Source)
-        BeginDecode()
     End Sub
 
     Private Sub ReadHeader(Source As String)
