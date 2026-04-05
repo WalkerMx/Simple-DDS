@@ -1,4 +1,4 @@
-# Managed DDS Encoder/Decoder (VB.NET)
+# Simple DDS Encoder/Decoder (VB.NET)
 
 A lightweight, fully managed DDS encoder and decoder. This library provides a zero-dependency solution for handling DirectDraw Surface textures in .NET, utilizing parallel processing for high performance.
 
