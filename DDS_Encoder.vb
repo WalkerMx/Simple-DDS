@@ -12,16 +12,43 @@ Public Class DDS_Encoder
 
     Public Disposed As Boolean
 
+    Public Signature As String
+    Public HeaderSize As Integer
+    Public SurfaceFlags As DDS_SurfaceFlags
+    Public Height As Integer
+    Public Width As Integer
+    Public PitchLinearSize As Integer
+    Public Depth As Integer
+    Public MipMapCount As Integer
+
+    Public SubHeaderSize As Integer
+    Public PixelFlags As DDS_PixelFlags
+    Public FourCC As String
+    Public RGBBitCount As Integer
+
+    Public RedBitMask As Byte()
+    Public GreenBitMask As Byte()
+    Public BlueBitMask As Byte()
+    Public AlphaBitMask As Byte()
+
+    Public Caps1 As DDS_Caps1
+    Public Caps2 As Integer
+
+    Public DXGIFormat As DXGI_Format
+    Public ResourceDimension As DX10_ResourceDimension
+    Public MiscFlag As DX10_MiscFlags
+    Public ArraySize As Integer
+    Public MiscFlags2 As DX10_MiscFlags2
+
     Private SourcePath As String
     Private AlphaMode As Integer
     Private MipMapEnabled As Boolean
     Private CompressionEnabled As Boolean
     Private HighQualityEnabled As Boolean
-
-    Private Width As Integer
-    Private Height As Integer
+    Private ExtendedHeaderEnabled As Boolean
 
     Private MipCount As Integer
+    Private BytesPerBlock As Integer
 
     Private HeaderBytes As Byte()
     Private PayloadBytes As Byte()
@@ -37,29 +64,23 @@ Public Class DDS_Encoder
     ''' <param name="HighQuality">Use advanced proccessing for compressing blocks at the cost speed.</param>
     Public Sub New(Source As String, Alpha As Integer, Compress As Boolean, MipMaps As Boolean, ExtendedHeader As Boolean, Optional HighQuality As Boolean = True)
 
-        Dim SurfaceFlags As New DDS_SurfaceFlags
-        Dim PixelFlags As DDS_PixelFlags
-        Dim Caps1 As New DDS_Caps1
-        Dim DXGIFormat As New DXGI_Format
-        Dim ResourceDimension As DX10_ResourceDimension = DX10_ResourceDimension.D3D10_RESOURCE_DIMENSION_TEXTURE2D
-        Dim MiscFlag As DX10_MiscFlags = DX10_MiscFlags.D3D10_RESOURCE_MISC_NONE
-        Dim MiscFlag2 As New DX10_AlphaMode
-        Dim RGBBitCount As Integer = 32
-        Dim PLS As Integer
-        Dim FourCC As String = "DXT1"
-        Dim BytesPerBlock As Integer = 8
-        Dim RMask As Byte() = {0, 0, &HFF, 0}
-        Dim GMask As Byte() = {0, &HFF, 0, 0}
-        Dim BMask As Byte() = {&HFF, 0, 0, 0}
-        Dim AMask As Byte() = {0, 0, 0, &HFF}
+        ResourceDimension = DX10_ResourceDimension.D3D10_RESOURCE_DIMENSION_TEXTURE2D
+        MiscFlag = DX10_MiscFlags.D3D10_RESOURCE_MISC_NONE
+        RGBBitCount = 32
+        FourCC = "DXT1"
+        RedBitMask = {0, 0, &HFF, 0}
+        GreenBitMask = {0, &HFF, 0, 0}
+        BlueBitMask = {&HFF, 0, 0, 0}
+        AlphaBitMask = {0, 0, 0, &HFF}
 
         SourcePath = Source
         AlphaMode = Alpha
         MipMapEnabled = MipMaps
         CompressionEnabled = Compress
         HighQualityEnabled = HighQuality
+        ExtendedHeaderEnabled = ExtendedHeader
 
-        HeaderBytes = New Byte(127) {}
+        BytesPerBlock = 8
 
         Using TempImage As Image = Image.FromFile(Source)
             Width = TempImage.Width
@@ -74,7 +95,7 @@ Public Class DDS_Encoder
         If Alpha > 0 Then
             PixelFlags = PixelFlags Or DDS_PixelFlags.DDPF_ALPHAPIXELS
         Else
-            AMask = {0, 0, 0, 0}
+            AlphaBitMask = {0, 0, 0, 0}
         End If
 
         If Compress = True Then
@@ -84,16 +105,16 @@ Public Class DDS_Encoder
                 FourCC = "DXT5"
                 BytesPerBlock = 16
             End If
-            PLS = Math.Max(1, ((Width + 3) \ 4)) * BytesPerBlock * Math.Max(1, ((Height + 3) \ 4))
-            RMask = {0, 0, 0, 0}
-            GMask = {0, 0, 0, 0}
-            BMask = {0, 0, 0, 0}
-            AMask = {0, 0, 0, 0}
+            PitchLinearSize = Math.Max(1, ((Width + 3) \ 4)) * BytesPerBlock * Math.Max(1, ((Height + 3) \ 4))
+            RedBitMask = {0, 0, 0, 0}
+            GreenBitMask = {0, 0, 0, 0}
+            BlueBitMask = {0, 0, 0, 0}
+            AlphaBitMask = {0, 0, 0, 0}
         Else
             FourCC = ""
             SurfaceFlags = SurfaceFlags Or DDS_SurfaceFlags.DDSD_PITCH
             PixelFlags = PixelFlags Or DDS_PixelFlags.DDPF_RGB
-            PLS = Width * 4
+            PitchLinearSize = Width * 4
         End If
 
         If MipMaps Then
@@ -104,42 +125,54 @@ Public Class DDS_Encoder
 
         If ExtendedHeader = True Then
             FourCC = "DX10"
-            RMask = {0, 0, 0, 0}
-            GMask = {0, 0, 0, 0}
-            BMask = {0, 0, 0, 0}
-            AMask = {0, 0, 0, 0}
-            HeaderBytes = New Byte(147) {}
+            RedBitMask = {0, 0, 0, 0}
+            GreenBitMask = {0, 0, 0, 0}
+            BlueBitMask = {0, 0, 0, 0}
+            AlphaBitMask = {0, 0, 0, 0}
             PixelFlags = DDS_PixelFlags.DDPF_FOURCC
             RGBBitCount = 0
-            Select Case Alpha
-                Case 0
-                    If Compress Then
+
+            If Compress Then
+                Select Case Alpha
+                    Case 0
                         DXGIFormat = DXGI_Format.DXGI_FORMAT_BC1_UNORM
-                    Else
-                        DXGIFormat = DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM
-                    End If
-                    MiscFlag2 = DX10_AlphaMode.DDS_ALPHA_MODE_OPAQUE
-                Case 1
-                    DXGIFormat = DXGI_Format.DXGI_FORMAT_BC1_UNORM
-                    MiscFlag2 = DX10_AlphaMode.DDS_ALPHA_MODE_STRAIGHT
-                Case 2
-                    If Compress Then
+                        MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_OPAQUE
+                    Case 1
+                        DXGIFormat = DXGI_Format.DXGI_FORMAT_BC1_UNORM
+                        MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_STRAIGHT
+                    Case 2
                         DXGIFormat = DXGI_Format.DXGI_FORMAT_BC3_UNORM
-                    Else
+                        MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_STRAIGHT
+                End Select
+            Else
+                Select Case Alpha
+                    Case 0
+                        DXGIFormat = DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM
+                        MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_OPAQUE
+                    Case 2
                         DXGIFormat = DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM
-                    End If
-                    MiscFlag2 = DX10_AlphaMode.DDS_ALPHA_MODE_STRAIGHT
-            End Select
+                        MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_STRAIGHT
+                End Select
+            End If
+
         End If
 
-        Using HeaderStream As New MemoryStream(HeaderBytes)
+        WriteHeader()
+
+        BeginEncode()
+
+    End Sub
+
+    Private Sub WriteHeader()
+
+        Using HeaderStream As New MemoryStream()
 
             HeaderStream.Write(OrderBytes("DDS "), 0, 4)                    ' dwMagic
             HeaderStream.Write(OrderBytes(124), 0, 4)                       ' dwSize
             HeaderStream.Write(OrderBytes(SurfaceFlags), 0, 4)              ' dwFlags
             HeaderStream.Write(OrderBytes(Height), 0, 4)                    ' dwHeight
             HeaderStream.Write(OrderBytes(Width), 0, 4)                     ' dwWidth
-            HeaderStream.Write(OrderBytes(PLS), 0, 4)                       ' dwPitchOrLinearSize
+            HeaderStream.Write(OrderBytes(PitchLinearSize), 0, 4)           ' dwPitchOrLinearSize
             HeaderStream.Write(OrderBytes(0), 0, 4)                         ' dwDepth
             HeaderStream.Write(OrderBytes(MipCount), 0, 4)                  ' dwMipMapCount
 
@@ -149,65 +182,57 @@ Public Class DDS_Encoder
             HeaderStream.Write(OrderBytes(PixelFlags), 0, 4)                ' DDPIXELFORMAT dwFlags
             HeaderStream.Write(OrderBytes(FourCC), 0, 4)                    ' DDPIXELFORMAT dwFourCC
             HeaderStream.Write(OrderBytes(RGBBitCount), 0, 4)               ' DDPIXELFORMAT dwRGBBitCount
-            HeaderStream.Write(RMask, 0, 4)                                 ' DDPIXELFORMAT dwRBitMask
-            HeaderStream.Write(GMask, 0, 4)                                 ' DDPIXELFORMAT dwGBitMask
-            HeaderStream.Write(BMask, 0, 4)                                 ' DDPIXELFORMAT dwBBitMask
-            HeaderStream.Write(AMask, 0, 4)                                 ' DDPIXELFORMAT dwABitMask
+            HeaderStream.Write(RedBitMask, 0, 4)                            ' DDPIXELFORMAT dwRBitMask
+            HeaderStream.Write(GreenBitMask, 0, 4)                          ' DDPIXELFORMAT dwGBitMask
+            HeaderStream.Write(BlueBitMask, 0, 4)                           ' DDPIXELFORMAT dwBBitMask
+            HeaderStream.Write(AlphaBitMask, 0, 4)                          ' DDPIXELFORMAT dwABitMask
 
             HeaderStream.Write(OrderBytes(Caps1), 0, 4)                     ' dwCaps1
             HeaderStream.Write(OrderBytes(0), 0, 4)                         ' dwCaps2
 
             HeaderStream.Seek(12, SeekOrigin.Current)                       ' dwCaps3, dwCaps4, dwReserved2
 
-            If ExtendedHeader Then
+            If ExtendedHeaderEnabled Then
                 HeaderStream.Write(OrderBytes(DXGIFormat), 0, 4)            ' dwDxgiFormat
                 HeaderStream.Write(OrderBytes(ResourceDimension), 0, 4)     ' dwResourceDimension
                 HeaderStream.Write(OrderBytes(MiscFlag), 0, 4)              ' dwMiscFlag
                 HeaderStream.Write(OrderBytes(1), 0, 4)                     ' dwArraySize
-                HeaderStream.Write(OrderBytes(MiscFlag2), 0, 4)             ' dwMiscFlags2
+                HeaderStream.Write(OrderBytes(MiscFlags2), 0, 4)            ' dwMiscFlags2
             End If
+
+            HeaderBytes = HeaderStream.ToArray
 
         End Using
 
     End Sub
 
     Private Sub BeginEncode()
-
-        Dim CurrentW As Integer = Width
-        Dim CurrentH As Integer = Height
-        Dim CurrentBytes As Byte()
-
+        Dim TempBytes As Byte()
+        Dim TempWidth As Integer = Width
+        Dim TempHeight As Integer = Height
         Using PayloadStream As New MemoryStream()
-
             PayloadStream.Write(HeaderBytes, 0, HeaderBytes.Count)
-
             Using TempImage As Image = Image.FromFile(SourcePath)
-                CurrentBytes = ExtractBitmapBytes(TempImage)
+                TempBytes = ExtractBitmapBytes(TempImage)
             End Using
-
-            Dim TempBytes As Byte() = GetImageData(CurrentBytes, CurrentW, CurrentH, AlphaMode, CompressionEnabled, HighQualityEnabled)
-
-            PayloadStream.Write(TempBytes, 0, TempBytes.Count)
-
+            Dim NextBytes As Byte() = GetImageData(TempBytes, TempWidth, TempHeight)
+            PayloadStream.Write(NextBytes, 0, NextBytes.Count)
             If MipMapEnabled Then
                 For i = 0 To MipCount - 2
-                    CurrentBytes = HalveArray(CurrentBytes, CurrentW, CurrentH)
-                    CurrentW = Math.Max(1, CurrentW >> 1)
-                    CurrentH = Math.Max(1, CurrentH >> 1)
-                    TempBytes = GetImageData(CurrentBytes, CurrentW, CurrentH, AlphaMode, CompressionEnabled, HighQualityEnabled)
-                    PayloadStream.Write(TempBytes, 0, TempBytes.Count)
+                    TempBytes = HalveArray(TempBytes, TempWidth, TempHeight)
+                    TempWidth = Math.Max(1, TempWidth >> 1)
+                    TempHeight = Math.Max(1, TempHeight >> 1)
+                    NextBytes = GetImageData(TempBytes, TempWidth, TempHeight)
+                    PayloadStream.Write(NextBytes, 0, NextBytes.Count)
                 Next
             End If
-
             PayloadBytes = PayloadStream.ToArray
-
         End Using
-
     End Sub
 
-    Private Function GetImageData(BitmapBytes As Byte(), Width As Integer, Height As Integer, AlphaMode As Integer, Compress As Boolean, HighQuality As Boolean) As Byte()
-        If Compress Then
-            Return BlockCompress(BitmapBytes, Width, Height, AlphaMode, HighQuality)
+    Private Function GetImageData(BitmapBytes As Byte(), Width As Integer, Height As Integer) As Byte()
+        If CompressionEnabled Then
+            Return BlockCompress(BitmapBytes, Width, Height)
         Else
             Return WriteUncompressed(BitmapBytes, AlphaMode <> 0)
         End If
@@ -234,46 +259,43 @@ Public Class DDS_Encoder
         Return Result
     End Function
 
-    Private Function BlockCompress(SourceData As Byte(), Width As Integer, Height As Integer, AlphaLevel As Integer, HighQuality As Boolean) As Byte()
-        Dim IsBC3 As Boolean = (AlphaLevel = 2)
-        Dim BytesPerBlock As Integer = If(IsBC3, 16, 8)
-        Dim BlocksWide As Integer = Math.Max(1, (Width + 3) \ 4)
-        Dim BlocksHigh As Integer = Math.Max(1, (Height + 3) \ 4)
-        Dim Result(BlocksWide * BlocksHigh * BytesPerBlock - 1) As Byte
-        Dim Options As New ParallelOptions With {.MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount \ 2)}
-        Parallel.For(0, BlocksHigh, Options, Sub(yBlock)
-                                                 Dim yPixelBase As Integer = yBlock * 4
-                                                 Dim rowOutputOffset As Integer = yBlock * BlocksWide * BytesPerBlock
-                                                 For xBlock As Integer = 0 To BlocksWide - 1
-                                                     Dim xPixelBase As Integer = xBlock * 4
-                                                     Dim BlockColors As UShort() = New UShort(15) {}
-                                                     Dim BlockAlphas As Byte() = New Byte(15) {}
-                                                     For j As Integer = 0 To 3
-                                                         Dim py As Integer = Math.Min(yPixelBase + j, Height - 1)
-                                                         Dim rowInputOffset As Integer = py * Width * 4
-                                                         For i As Integer = 0 To 3
-                                                             Dim px As Integer = Math.Min(xPixelBase + i, Width - 1)
-                                                             Dim pixelIdx As Integer = rowInputOffset + (px * 4)
-                                                             Dim b As Byte = SourceData(pixelIdx)
-                                                             Dim g As Byte = SourceData(pixelIdx + 1)
-                                                             Dim r As Byte = SourceData(pixelIdx + 2)
-                                                             Dim a As Byte = SourceData(pixelIdx + 3)
-                                                             BlockAlphas(j * 4 + i) = a
-                                                             If AlphaLevel = 1 AndAlso a < 128 Then
-                                                                 BlockColors(j * 4 + i) = 0
-                                                             Else
-                                                                 BlockColors(j * 4 + i) = CType(((CInt(r) And &HF8) << 8) Or ((CInt(g) And &HFC) << 3) Or (CInt(b) >> 3), UShort)
-                                                             End If
-                                                         Next
-                                                     Next
-                                                     Dim currentBlockOffset As Integer = rowOutputOffset + (xBlock * BytesPerBlock)
-                                                     If IsBC3 Then
-                                                         Array.Copy(EncodeAlphaBlockBC3(BlockAlphas), 0, Result, currentBlockOffset, 8)
-                                                         currentBlockOffset += 8
-                                                     End If
-                                                     Array.Copy(EncodeColorBlockBC1(BlockColors, AlphaLevel <> 1, HighQuality), 0, Result, currentBlockOffset, 8)
-                                                 Next
-                                             End Sub)
+    Private Function BlockCompress(SourceData As Byte(), Width As Integer, Height As Integer) As Byte()
+        Dim BlockWidth As Integer = Math.Max(1, (Width + 3) \ 4)
+        Dim BlockHeight As Integer = Math.Max(1, (Height + 3) \ 4)
+        Dim Result(BlockWidth * BlockHeight * BytesPerBlock - 1) As Byte
+        Parallel.For(0, BlockHeight, Options, Sub(yBlock)
+                                                  Dim yPixelBase As Integer = yBlock * 4
+                                                  Dim rowOutputOffset As Integer = yBlock * BlockWidth * BytesPerBlock
+                                                  For xBlock As Integer = 0 To BlockWidth - 1
+                                                      Dim xPixelBase As Integer = xBlock * 4
+                                                      Dim BlockColors As UShort() = New UShort(15) {}
+                                                      Dim BlockAlphas As Byte() = New Byte(15) {}
+                                                      For j As Integer = 0 To 3
+                                                          Dim py As Integer = Math.Min(yPixelBase + j, Height - 1)
+                                                          Dim rowInputOffset As Integer = py * Width * 4
+                                                          For i As Integer = 0 To 3
+                                                              Dim px As Integer = Math.Min(xPixelBase + i, Width - 1)
+                                                              Dim pixelIdx As Integer = rowInputOffset + (px * 4)
+                                                              Dim b As Byte = SourceData(pixelIdx)
+                                                              Dim g As Byte = SourceData(pixelIdx + 1)
+                                                              Dim r As Byte = SourceData(pixelIdx + 2)
+                                                              Dim a As Byte = SourceData(pixelIdx + 3)
+                                                              BlockAlphas(j * 4 + i) = a
+                                                              If AlphaMode = 1 AndAlso a < 128 Then
+                                                                  BlockColors(j * 4 + i) = 0
+                                                              Else
+                                                                  BlockColors(j * 4 + i) = CType(((CInt(r) And &HF8) << 8) Or ((CInt(g) And &HFC) << 3) Or (CInt(b) >> 3), UShort)
+                                                              End If
+                                                          Next
+                                                      Next
+                                                      Dim currentBlockOffset As Integer = rowOutputOffset + (xBlock * BytesPerBlock)
+                                                      If AlphaMode = 2 Then
+                                                          Array.Copy(EncodeAlphaBlockBC3(BlockAlphas), 0, Result, currentBlockOffset, 8)
+                                                          currentBlockOffset += 8
+                                                      End If
+                                                      Array.Copy(EncodeColorBlockBC1(BlockColors, AlphaMode <> 1, HighQualityEnabled), 0, Result, currentBlockOffset, 8)
+                                                  Next
+                                              End Sub)
         Return Result
     End Function
 
@@ -316,106 +338,77 @@ Public Class DDS_Encoder
     End Function
 
     Private Function EncodeColorBlockBC1(PixelArray As UShort(), ForceOpaque As Boolean, HighQuality As Boolean) As Byte()
-        Dim Result(7) As Byte
         Dim Col0 As UShort
         Dim Col1 As UShort
-        If HighQuality = False Then
-            Col0 = 0
-            Col1 = 255
-            For i = 0 To PixelArray.Count - 1
-                If PixelArray(i) > Col0 Then Col0 = PixelArray(i)
-                If PixelArray(i) < Col1 Then Col1 = PixelArray(i)
+        If Not HighQuality Then
+            Col0 = PixelArray(0) : Col1 = PixelArray(0)
+            For Each Pixel In PixelArray
+                If Pixel > Col0 Then Col0 = Pixel Else If Pixel < Col1 Then Col1 = Pixel
             Next
         Else
-            Dim Lum0 As Double = -1
-            Dim Lum1 As Double = 1000
+            Dim MaxLum As Double = -1.0
+            Dim MinLum As Double = 1000.0
             For Each Pixel In PixelArray
-                Dim RVal As Integer = (Pixel >> 11) << 3
-                Dim GVal As Integer = ((Pixel >> 5) And &H3F) << 2
-                Dim BVal As Integer = (Pixel And &H1F) << 3
-                Dim Lum As Double = (0.299 * RVal) + (0.587 * GVal) + (0.114 * BVal)
-                If Lum > Lum0 Then Lum0 = Lum : Col0 = Pixel
-                If Lum < Lum1 Then Lum1 = Lum : Col1 = Pixel
+                Dim Lum As Double = (0.299 * ((Pixel >> 11) << 3)) + (0.587 * (((Pixel >> 5) And &H3F) << 2)) + (0.114 * ((Pixel And &H1F) << 3))
+                If Lum > MaxLum Then MaxLum = Lum : Col0 = Pixel
+                If Lum < MinLum Then MinLum = Lum : Col1 = Pixel
             Next
         End If
         If ForceOpaque Then
             If Col0 < Col1 Then
                 Swap(Col0, Col1)
-            ElseIf Col0 = Col1 Then
-                If Col0 > 0 Then Col1 -= 1US Else Col0 += 1US
-            End If
-        Else
-            If Col0 > Col1 Then
-                Swap(Col0, Col1)
-            End If
-        End If
-        Result(0) = CByte(Col0 And &HFF)
-        Result(1) = CByte(Col0 >> 8)
-        Result(2) = CByte(Col1 And &HFF)
-        Result(3) = CByte(Col1 >> 8)
-        Dim R0 As Integer = (Col0 >> 11) << 3
-        Dim G0 As Integer = ((Col0 >> 5) And &H3F) << 2
-        Dim B0 As Integer = (Col0 And &H1F) << 3
-        Dim R1 As Integer = (Col1 >> 11) << 3
-        Dim G1 As Integer = ((Col1 >> 5) And &H3F) << 2
-        Dim B1 As Integer = (Col1 And &H1F) << 3
-        Dim C(3, 2) As Integer
-        C(0, 0) = R0
-        C(0, 1) = G0
-        C(0, 2) = B0
-        C(1, 0) = R1
-        C(1, 1) = G1
-        C(1, 2) = B1
-        If ForceOpaque Then
-            C(2, 0) = (2 * R0 + R1) \ 3
-            C(2, 1) = (2 * G0 + G1) \ 3
-            C(2, 2) = (2 * B0 + B1) \ 3
-            C(3, 0) = (R0 + 2 * R1) \ 3
-            C(3, 1) = (G0 + 2 * G1) \ 3
-            C(3, 2) = (B0 + 2 * B1) \ 3
-        Else
-            C(2, 0) = (R0 + R1) \ 2
-            C(2, 1) = (G0 + G1) \ 2
-            C(2, 2) = (B0 + B1) \ 2
-        End If
-        Dim Midpoint As Integer = ((Col0 And &HF7DE) >> 1) + ((Col1 And &HF7DE) >> 1)
-        Dim Offset As Integer = 4
-        For j As Integer = 0 To 3
-            Dim BitByte As Byte = 0
-            For i As Integer = 3 To 0 Step -1
-                Dim Pixel As UShort = PixelArray(j * 4 + i)
-                Dim Index As Byte = 0
-                If Not ForceOpaque AndAlso Pixel = 0 Then
-                    Index = &B11
-                ElseIf HighQuality = False Then
-                    If Pixel = Col0 Then
-                        Index = &B0
-                    ElseIf Pixel = Col1 Then
-                        Index = &B1
+            Else
+                If Col0 = Col1 Then
+                    If Col0 > 0 Then
+                        Col1 -= 1US
                     Else
-                        Index = If(Pixel > Midpoint, &B10, &B11)
+                        Col0 += 1US
                     End If
-                Else
-                    Dim PixelR As Integer = (Pixel >> 11) << 3
-                    Dim PixelG As Integer = ((Pixel >> 5) And &H3F) << 2
-                    Dim PixelB As Integer = (Pixel And &H1F) << 3
-                    Dim MinError As Long = Long.MaxValue
-                    Dim Count As Integer = If(ForceOpaque, 3, 2)
-                    For k As Integer = 0 To Count
-                        Dim dR As Long = CLng(PixelR - C(k, 0))
-                        Dim dG As Long = CLng(PixelG - C(k, 1))
-                        Dim dB As Long = CLng(PixelB - C(k, 2))
-                        Dim Distance As Long = (dR * dR) + (dG * dG) + (dB * dB)
-                        If Distance < MinError Then
-                            MinError = Distance
-                            Index = CByte(k)
-                        End If
-                    Next
                 End If
-                BitByte = CByte((BitByte << 2) Or Index)
-            Next
-            Result(Offset) = BitByte : Offset += 1
+            End If
+        ElseIf Col0 > Col1 Then
+            Swap(Col0, Col1)
+        End If
+        Dim RVals(3) As Integer
+        Dim GVals(3) As Integer
+        Dim BVals(3) As Integer
+        RVals(0) = (Col0 >> 11) << 3 : GVals(0) = ((Col0 >> 5) And &H3F) << 2 : BVals(0) = (Col0 And &H1F) << 3
+        RVals(1) = (Col1 >> 11) << 3 : GVals(1) = ((Col1 >> 5) And &H3F) << 2 : BVals(1) = (Col1 And &H1F) << 3
+        If ForceOpaque Then
+            RVals(2) = (2 * RVals(0) + RVals(1)) \ 3 : GVals(2) = (2 * GVals(0) + GVals(1)) \ 3 : BVals(2) = (2 * BVals(0) + BVals(1)) \ 3
+            RVals(3) = (RVals(0) + 2 * RVals(1)) \ 3 : GVals(3) = (GVals(0) + 2 * GVals(1)) \ 3 : BVals(3) = (BVals(0) + 2 * BVals(1)) \ 3
+        Else
+            RVals(2) = (RVals(0) + RVals(1)) \ 2 : GVals(2) = (GVals(0) + GVals(1)) \ 2 : BVals(2) = (BVals(0) + BVals(1)) \ 2
+        End If
+        Dim ColorTable As UInteger = 0
+        Dim Midpoint As Integer = ((Col0 And &HF7DE) >> 1) + ((Col1 And &HF7DE) >> 1)
+        For i As Integer = 0 To 15
+            Dim Pixel As UShort = PixelArray(i)
+            Dim Index As UInteger = 0
+            If Not ForceOpaque AndAlso Pixel = 0 Then
+                Index = 3
+            ElseIf Not HighQuality Then
+                If Pixel = Col0 Then Index = 0 Else If Pixel = Col1 Then Index = 1 Else Index = If(Pixel > Midpoint, 2, 3)
+            Else
+                Dim PixR As UShort = (Pixel >> 11) << 3
+                Dim PixG As UShort = ((Pixel >> 5) And &H3F) << 2
+                Dim PixB As UShort = (Pixel And &H1F) << 3
+                Dim MinError As Long = Long.MaxValue
+                Dim Count = If(ForceOpaque, 3, 2)
+                For k = 0 To Count
+                    Dim DistR As Integer = PixR - RVals(k)
+                    Dim DistG As Integer = PixG - GVals(k)
+                    Dim DistB As Integer = PixB - BVals(k)
+                    Dim CurrentError As Long = (DistR * DistR) + (DistG * DistG) + (DistB * DistB)
+                    If CurrentError < MinError Then MinError = CurrentError : Index = CUInt(k)
+                Next
+            End If
+            ColorTable = ColorTable Or (Index << (i * 2))
         Next
+        Dim Result(7) As Byte
+        BitConverter.GetBytes(Col0).CopyTo(Result, 0)
+        BitConverter.GetBytes(Col1).CopyTo(Result, 2)
+        BitConverter.GetBytes(ColorTable).CopyTo(Result, 4)
         Return Result
     End Function
 
@@ -441,14 +434,14 @@ Public Class DDS_Encoder
     End Function
 
     Private Function HalveArray(SourceData() As Byte, Width As Integer, Height As Integer) As Byte()
-        Dim NewW As Integer = Math.Max(1, Width >> 1)
-        Dim NewH As Integer = Math.Max(1, Height >> 1)
-        Dim DestData(NewW * NewH * 4 - 1) As Byte
-        For y As Integer = 0 To NewH - 1
+        Dim TempWidth As Integer = Math.Max(1, Width >> 1)
+        Dim TempHeight As Integer = Math.Max(1, Height >> 1)
+        Dim DestData(TempWidth * TempHeight * 4 - 1) As Byte
+        For y As Integer = 0 To TempHeight - 1
             Dim srcY0 As Integer = (y << 1) * Width * 4
             Dim srcY1 As Integer = Math.Min((y << 1) + 1, Height - 1) * Width * 4
-            Dim destRowOffset As Integer = y * NewW * 4
-            For x As Integer = 0 To NewW - 1
+            Dim destRowOffset As Integer = y * TempWidth * 4
+            For x As Integer = 0 To TempWidth - 1
                 Dim x0 As Integer = (x << 1) * 4
                 Dim x1 As Integer = Math.Min((x << 1) + 1, Width - 1) * 4
                 Dim destPixelOffset As Integer = destRowOffset + (x * 4)

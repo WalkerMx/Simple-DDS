@@ -8,7 +8,6 @@ Imports System.Drawing.Imaging
 Imports System.Runtime.InteropServices
 
 Public Class DDS_Decoder
-
     Implements IDisposable
 
     Public Disposed As Boolean
@@ -35,13 +34,13 @@ Public Class DDS_Decoder
     Public Caps1 As DDS_Caps1
     Public Caps2 As Integer
 
-    Public ExtendedHeader As Boolean
-
     Public DXGIFormat As DXGI_Format
     Public ResourceDimension As DX10_ResourceDimension
     Public MiscFlag As DX10_MiscFlags
     Public ArraySize As Integer
-    Public MiscFlags2 As DX10_AlphaMode
+    Public MiscFlags2 As DX10_MiscFlags2
+
+    Public ExtendedHeader As Boolean
 
     Private SourceBytes As Byte()
     Private DecodedBytes As Byte()
@@ -50,6 +49,7 @@ Public Class DDS_Decoder
     Public Sub New(Source As String)
         FilePath = Source
         ReadHeader(Source)
+        BeginDecode()
     End Sub
 
     Private Sub ReadHeader(Source As String)
@@ -111,7 +111,7 @@ Public Class DDS_Decoder
             Select Case DXGIFormat
                 Case DXGI_Format.DXGI_FORMAT_BC1_UNORM
                     CompressionMode = 1
-                    AlphaMode = If(MiscFlags2 = DX10_AlphaMode.DDS_ALPHA_MODE_OPAQUE, 0, 1)
+                    AlphaMode = If(MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_OPAQUE, 0, 1)
                     BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 8
                 Case DXGI_Format.DXGI_FORMAT_BC3_UNORM
                     CompressionMode = 2
@@ -157,14 +157,11 @@ Public Class DDS_Decoder
             SourceBytes = GetFileBytes(FilePath, DataOffset, BytesToRead)
         End If
 
-        Select Case CompressionMode
-            Case 0
-                DecodeUncompressed(AlphaMode)
-            Case 1
-                DecodeBC1(AlphaMode)
-            Case 2
-                DecodeBC3()
-        End Select
+        If CompressionMode = 0 Then
+            DecodeUncompressed(AlphaMode)
+        Else
+            DecodeCompressed(AlphaMode)
+        End If
 
     End Sub
 
@@ -186,8 +183,6 @@ Public Class DDS_Decoder
         Dim DecodeAlpha As Boolean = (AlphaMode > 0) AndAlso (AlphaBitMask <> 0)
 
         DecodedBytes = New Byte(Width * Height * 4 - 1) {}
-
-        Dim Options As New ParallelOptions With {.MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount \ 2)}
 
         Parallel.For(0, Height, Options, Sub(y)
                                              Dim SourceRowStart As Integer = y * RowPitch
@@ -221,137 +216,108 @@ Public Class DDS_Decoder
                                          End Sub)
     End Sub
 
-    Private Sub DecodeBC1(AlphaMode As Integer)
-        Dim blocksWide As Integer = (Width + 3) \ 4
-        Dim blocksHigh As Integer = (Height + 3) \ 4
+    Private Sub DecodeCompressed(AlphaMode As Integer)
+        Dim BlockWidth As Integer = (Width + 3) \ 4
+        Dim BlockHeight As Integer = (Height + 3) \ 4
+        Dim BytesPerBlock As Integer = If(AlphaMode = 2, 16, 8)
+
         DecodedBytes = New Byte(Width * Height * 4 - 1) {}
 
-        Dim Options As New ParallelOptions With {.MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount \ 2)}
+        Parallel.For(0, BlockHeight, Options, Sub(yBlock)
+                                                  Dim ColorPalette(3, 3) As Byte
+                                                  Dim AlphaPalette(7) As Byte
 
-        Parallel.For(0, blocksHigh, Options, Sub(yBlock)
-                                                 For xBlock As Integer = 0 To blocksWide - 1
-                                                     Dim sourceIndex As Integer = (yBlock * blocksWide + xBlock) * 8
+                                                  For xBlock As Integer = 0 To BlockWidth - 1
+                                                      Dim SourceIndex As Integer = (yBlock * BlockWidth + xBlock) * BytesPerBlock
+                                                      Dim ColorOffset As Integer = If(AlphaMode = 2, SourceIndex + 8, SourceIndex)
 
-                                                     Dim c0_raw As UShort = BitConverter.ToUInt16(SourceBytes, sourceIndex)
-                                                     Dim c1_raw As UShort = BitConverter.ToUInt16(SourceBytes, sourceIndex + 2)
+                                                      Dim ColorTable As UInteger = DecodeColorBlock(ColorOffset, ColorPalette, AlphaMode)
+                                                      Dim AlphaTable As ULong = 0
 
-                                                     Dim lookupTable As UInteger = BitConverter.ToUInt32(SourceBytes, sourceIndex + 4)
+                                                      If AlphaMode = 2 Then
+                                                          AlphaTable = DecodeAlphaBlock(SourceIndex, AlphaPalette)
+                                                      End If
 
-                                                     Dim pal(3, 3) As Byte
-                                                     Dim p0() As Byte = Unpack565(c0_raw)
-                                                     Dim p1() As Byte = Unpack565(c1_raw)
+                                                      For i As Integer = 0 To 15
+                                                          Dim py As Integer = (yBlock * 4) + (i >> 2)
+                                                          Dim px As Integer = (xBlock * 4) + (i And 3)
 
-                                                     pal(0, 0) = p0(0) : pal(0, 1) = p0(1) : pal(0, 2) = p0(2) : pal(0, 3) = 255
-                                                     pal(1, 0) = p1(0) : pal(1, 1) = p1(1) : pal(1, 2) = p1(2) : pal(1, 3) = 255
+                                                          If px < Width AndAlso py < Height Then
+                                                              Dim destIdx As Integer = (py * Width + px) * 4
+                                                              Dim cIdx As Integer = CInt((ColorTable >> (i * 2)) And 3UI)
 
-                                                     If c0_raw > c1_raw Then
-                                                         pal(2, 0) = CByte((CInt(pal(0, 0)) * 2 + pal(1, 0)) \ 3)
-                                                         pal(2, 1) = CByte((CInt(pal(0, 1)) * 2 + pal(1, 1)) \ 3)
-                                                         pal(2, 2) = CByte((CInt(pal(0, 2)) * 2 + pal(1, 2)) \ 3)
-                                                         pal(2, 3) = 255
+                                                              DecodedBytes(destIdx) = ColorPalette(cIdx, 0)
+                                                              DecodedBytes(destIdx + 1) = ColorPalette(cIdx, 1)
+                                                              DecodedBytes(destIdx + 2) = ColorPalette(cIdx, 2)
 
-                                                         pal(3, 0) = CByte((CInt(pal(0, 0)) + pal(1, 0) * 2) \ 3)
-                                                         pal(3, 1) = CByte((CInt(pal(0, 1)) + pal(1, 1) * 2) \ 3)
-                                                         pal(3, 2) = CByte((CInt(pal(0, 2)) + pal(1, 2) * 2) \ 3)
-                                                         pal(3, 3) = 255
-                                                     Else
-                                                         pal(2, 0) = CByte((CInt(pal(0, 0)) + pal(1, 0)) \ 2)
-                                                         pal(2, 1) = CByte((CInt(pal(0, 1)) + pal(1, 1)) \ 2)
-                                                         pal(2, 2) = CByte((CInt(pal(0, 2)) + pal(1, 2)) \ 2)
-                                                         pal(2, 3) = 255
-
-                                                         pal(3, 0) = 0 : pal(3, 1) = 0 : pal(3, 2) = 0
-                                                         pal(3, 3) = If(AlphaMode = 1, 0, 255)
-                                                     End If
-
-                                                     For i As Integer = 0 To 15
-                                                         Dim py As Integer = (yBlock * 4) + (i \ 4)
-                                                         Dim px As Integer = (xBlock * 4) + (i Mod 4)
-
-                                                         If px < Width AndAlso py < Height Then
-                                                             Dim colorIdx As Integer = CInt((lookupTable >> (i * 2)) And 3UI)
-                                                             Dim destIdx As Integer = (py * Width + px) * 4
-
-                                                             DecodedBytes(destIdx) = pal(colorIdx, 0)
-                                                             DecodedBytes(destIdx + 1) = pal(colorIdx, 1)
-                                                             DecodedBytes(destIdx + 2) = pal(colorIdx, 2)
-                                                             DecodedBytes(destIdx + 3) = pal(colorIdx, 3)
-                                                         End If
-                                                     Next
-                                                 Next
-                                             End Sub)
+                                                              If AlphaMode = 2 Then
+                                                                  Dim AlphaIndex As Integer = CInt((AlphaTable >> (i * 3)) And 7UL)
+                                                                  DecodedBytes(destIdx + 3) = AlphaPalette(AlphaIndex)
+                                                              Else
+                                                                  DecodedBytes(destIdx + 3) = ColorPalette(cIdx, 3)
+                                                              End If
+                                                          End If
+                                                      Next
+                                                  Next
+                                              End Sub)
     End Sub
 
-    Private Sub DecodeBC3()
-        Dim blocksWide As Integer = (Width + 3) \ 4
-        Dim blocksHigh As Integer = (Height + 3) \ 4
-        DecodedBytes = New Byte(Width * Height * 4 - 1) {}
+    Private Function DecodeColorBlock(Offset As Integer, cPal(,) As Byte, AlphaMode As Integer) As UInteger
+        Dim c0_raw As UShort = BitConverter.ToUInt16(SourceBytes, Offset)
+        Dim c1_raw As UShort = BitConverter.ToUInt16(SourceBytes, Offset + 2)
+        Dim ColorTable As UInteger = BitConverter.ToUInt32(SourceBytes, Offset + 4)
 
-        Dim Options As New ParallelOptions With {.MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount \ 2)}
+        Dim p0() As Byte = Unpack565(c0_raw)
+        Dim p1() As Byte = Unpack565(c1_raw)
 
-        Parallel.For(0, blocksHigh, Options, Sub(yBlock)
-                                                 For xBlock As Integer = 0 To blocksWide - 1
-                                                     Dim sourceIndex As Integer = (yBlock * blocksWide + xBlock) * 16
+        cPal(0, 0) = p0(0) : cPal(0, 1) = p0(1) : cPal(0, 2) = p0(2) : cPal(0, 3) = 255
+        cPal(1, 0) = p1(0) : cPal(1, 1) = p1(1) : cPal(1, 2) = p1(2) : cPal(1, 3) = 255
 
-                                                     Dim a0 As Byte = SourceBytes(sourceIndex)
-                                                     Dim a1 As Byte = SourceBytes(sourceIndex + 1)
-                                                     Dim aPal(7) As Byte
-                                                     aPal(0) = a0
-                                                     aPal(1) = a1
+        If AlphaMode = 2 OrElse c0_raw > c1_raw Then
+            cPal(2, 0) = CByte((CInt(cPal(0, 0)) * 2 + cPal(1, 0)) \ 3)
+            cPal(2, 1) = CByte((CInt(cPal(0, 1)) * 2 + cPal(1, 1)) \ 3)
+            cPal(2, 2) = CByte((CInt(cPal(0, 2)) * 2 + cPal(1, 2)) \ 3)
+            cPal(2, 3) = 255
 
-                                                     If a0 > a1 Then
-                                                         For i As Integer = 1 To 6
-                                                             aPal(i + 1) = CByte(((7 - i) * CInt(a0) + i * CInt(a1)) \ 7)
-                                                         Next
-                                                     Else
-                                                         For i As Integer = 1 To 4
-                                                             aPal(i + 1) = CByte(((5 - i) * CInt(a0) + i * CInt(a1)) \ 5)
-                                                         Next
-                                                         aPal(6) = 0
-                                                         aPal(7) = 255
-                                                     End If
+            cPal(3, 0) = CByte((CInt(cPal(0, 0)) + cPal(1, 0) * 2) \ 3)
+            cPal(3, 1) = CByte((CInt(cPal(0, 1)) + cPal(1, 1) * 2) \ 3)
+            cPal(3, 2) = CByte((CInt(cPal(0, 2)) + cPal(1, 2) * 2) \ 3)
+            cPal(3, 3) = 255
+        Else
+            cPal(2, 0) = CByte((CInt(cPal(0, 0)) + cPal(1, 0)) \ 2)
+            cPal(2, 1) = CByte((CInt(cPal(0, 1)) + cPal(1, 1)) \ 2)
+            cPal(2, 2) = CByte((CInt(cPal(0, 2)) + cPal(1, 2)) \ 2)
+            cPal(2, 3) = 255
 
-                                                     Dim aData As ULong = 0
-                                                     For i As Integer = 0 To 5
-                                                         aData = aData Or (CType(SourceBytes(sourceIndex + 2 + i), ULong) << (i * 8))
-                                                     Next
+            cPal(3, 0) = 0 : cPal(3, 1) = 0 : cPal(3, 2) = 0
+            cPal(3, 3) = CByte(If(AlphaMode = 1, 0, 255))
+        End If
 
-                                                     Dim colorOffset As Integer = sourceIndex + 8
-                                                     Dim c0_raw As UShort = BitConverter.ToUInt16(SourceBytes, colorOffset)
-                                                     Dim c1_raw As UShort = BitConverter.ToUInt16(SourceBytes, colorOffset + 2)
-                                                     Dim lookupTable As UInteger = BitConverter.ToUInt32(SourceBytes, colorOffset + 4)
+        Return ColorTable
+    End Function
 
-                                                     Dim p0() As Byte = Unpack565(c0_raw)
-                                                     Dim p1() As Byte = Unpack565(c1_raw)
-                                                     Dim cPal(3, 2) As Byte
-
-                                                     For j = 0 To 2 : cPal(0, j) = p0(j) : cPal(1, j) = p1(j) : Next
-
-                                                     cPal(2, 0) = CByte((CInt(cPal(0, 0)) * 2 + cPal(1, 0)) \ 3)
-                                                     cPal(2, 1) = CByte((CInt(cPal(0, 1)) * 2 + cPal(1, 1)) \ 3)
-                                                     cPal(2, 2) = CByte((CInt(cPal(0, 2)) * 2 + cPal(1, 2)) \ 3)
-                                                     cPal(3, 0) = CByte((CInt(cPal(0, 0)) + cPal(1, 0) * 2) \ 3)
-                                                     cPal(3, 1) = CByte((CInt(cPal(0, 1)) + cPal(1, 1) * 2) \ 3)
-                                                     cPal(3, 2) = CByte((CInt(cPal(0, 2)) + cPal(1, 2) * 2) \ 3)
-
-                                                     For i As Integer = 0 To 15
-                                                         Dim py As Integer = (yBlock * 4) + (i \ 4)
-                                                         Dim px As Integer = (xBlock * 4) + (i Mod 4)
-
-                                                         If px < Width AndAlso py < Height Then
-                                                             Dim cIdx As Integer = CInt((lookupTable >> (i * 2)) And 3UI)
-                                                             Dim aIdx As Integer = CInt((aData >> (i * 3)) And 7UL)
-
-                                                             Dim destIdx As Integer = (py * Width + px) * 4
-                                                             DecodedBytes(destIdx) = cPal(cIdx, 0)
-                                                             DecodedBytes(destIdx + 1) = cPal(cIdx, 1)
-                                                             DecodedBytes(destIdx + 2) = cPal(cIdx, 2)
-                                                             DecodedBytes(destIdx + 3) = aPal(aIdx)
-                                                         End If
-                                                     Next
-                                                 Next
-                                             End Sub)
-    End Sub
+    Private Function DecodeAlphaBlock(Offset As Integer, aPal() As Byte) As ULong
+        Dim a0 As Byte = SourceBytes(Offset)
+        Dim a1 As Byte = SourceBytes(Offset + 1)
+        aPal(0) = a0
+        aPal(1) = a1
+        If a0 > a1 Then
+            For i As Integer = 1 To 6
+                aPal(i + 1) = CByte(((7 - i) * CInt(a0) + i * CInt(a1)) \ 7)
+            Next
+        Else
+            For i As Integer = 1 To 4
+                aPal(i + 1) = CByte(((5 - i) * CInt(a0) + i * CInt(a1)) \ 5)
+            Next
+            aPal(6) = 0
+            aPal(7) = 255
+        End If
+        Dim AlphaTable As ULong = 0
+        For i As Integer = 0 To 5
+            AlphaTable = AlphaTable Or (CType(SourceBytes(Offset + 2 + i), ULong) << (i * 8))
+        Next
+        Return AlphaTable
+    End Function
 
     Public Sub SaveImage(Path As String, Format As ImageFormat)
         BeginDecode()

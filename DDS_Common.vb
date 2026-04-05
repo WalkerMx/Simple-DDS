@@ -5,6 +5,8 @@
 
 Public Module DDS_Common
 
+    Public ReadOnly Options As New ParallelOptions With {.MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount \ 2)}
+
     <Flags>
     Public Enum DDS_SurfaceFlags
         DDSD_CAPS = &H1
@@ -78,7 +80,7 @@ Public Module DDS_Common
     End Enum
 
     <Flags>
-    Public Enum DX10_AlphaMode As Integer
+    Public Enum DX10_MiscFlags2 As Integer
         DDS_ALPHA_MODE_UNKNOWN = &H0
         DDS_ALPHA_MODE_STRAIGHT = &H1
         DDS_ALPHA_MODE_PREMULTIPLIED = &H2
