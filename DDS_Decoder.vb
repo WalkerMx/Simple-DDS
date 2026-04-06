@@ -124,6 +124,8 @@ Public Class DDS_Decoder
                     CompressionMode = 0
                     AlphaMode = 0
                     BytesToRead = Width * Height * 4
+                Case Else
+                    Throw New Exception("Unsupported DXGI Format!")
             End Select
         Else
             If (PixelFlags And DDS_PixelFlags.DDPF_FOURCC) = DDS_PixelFlags.DDPF_FOURCC Then
@@ -140,6 +142,8 @@ Public Class DDS_Decoder
                         CompressionMode = 2
                         AlphaMode = 2
                         BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 16
+                    Case Else
+                        Throw New Exception("Unsupported DXT Format!")
                 End Select
             ElseIf (PixelFlags And DDS_PixelFlags.DDPF_RGB) = DDS_PixelFlags.DDPF_RGB Then
                 CompressionMode = 0
@@ -149,6 +153,8 @@ Public Class DDS_Decoder
                 Else
                     AlphaMode = 0
                 End If
+            Else
+                Throw New Exception("Unknown Format Error!")
             End If
         End If
 
@@ -319,7 +325,12 @@ Public Class DDS_Decoder
     End Function
 
     Public Sub SaveImage(Path As String, Format As ImageFormat)
-        BeginDecode()
+        Try
+            BeginDecode()
+        Catch ex As Exception
+            MsgBox(ex.Message, MsgBoxStyle.Critical)
+            Exit Sub
+        End Try
         Using TempImage As New Bitmap(Width, Height, PixelFormat.Format32bppArgb)
             Dim Rect As New Rectangle(0, 0, Width, Height)
             Dim TempData As BitmapData = TempImage.LockBits(Rect, ImageLockMode.WriteOnly, TempImage.PixelFormat)
