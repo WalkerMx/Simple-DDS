@@ -29,8 +29,8 @@ Comparison testing was done on a Xeon E3-1260L, strictly on the CPU.  Results ar
 
 ### Encoding
 ```vbnet
-' Params: SourcePath, AlphaMode (0=None, 1=1-bit, 2=8-bit), Compress, MipMaps, DX10Header, HighQuality
-Using Encoder As New DDS_Encoder("input.png", 0, True, True, True, True)
+'SourcePath, AlphaMode (0=None, 1=1-bit, 2=8-bit), Compress, MipMaps, DX10Header, HighQuality
+Using Encoder As New DDS_Encoder("input.png", 0, True, False, True, True)
     Encoder.SaveImage("output.dds")
 End Using
 ```
