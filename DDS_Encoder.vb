@@ -174,7 +174,7 @@ Public Class DDS_Encoder
             HeaderStream.Write(OrderBytes(0), 0, 4)                         ' dwDepth
             HeaderStream.Write(OrderBytes(MipCount), 0, 4)                  ' dwMipMapCount
 
-            HeaderStream.Seek(44, SeekOrigin.Current)                       ' dwReserved1 x11
+            HeaderStream.Write(New Byte(43) {}, 0, 44)                      ' dwReserved1 x11
 
             HeaderStream.Write(OrderBytes(32), 0, 4)                        ' DDPIXELFORMAT dwSize
             HeaderStream.Write(OrderBytes(PixelFlags), 0, 4)                ' DDPIXELFORMAT dwFlags
@@ -188,7 +188,7 @@ Public Class DDS_Encoder
             HeaderStream.Write(OrderBytes(Caps1), 0, 4)                     ' dwCaps1
             HeaderStream.Write(OrderBytes(0), 0, 4)                         ' dwCaps2
 
-            HeaderStream.Seek(12, SeekOrigin.Current)                       ' dwCaps3, dwCaps4, dwReserved2
+            HeaderStream.Write(New Byte(11) {}, 0, 12)                      ' dwCaps3, dwCaps4, dwReserved2
 
             If ExtendedHeaderEnabled Then
                 HeaderStream.Write(OrderBytes(DXGIFormat), 0, 4)            ' dwDxgiFormat
