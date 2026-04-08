@@ -22,7 +22,6 @@ Partial Class Form1
     'Do not modify it using the code editor.
     <System.Diagnostics.DebuggerStepThrough()>
     Private Sub InitializeComponent()
-        Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(Form1))
         Me.Button1 = New System.Windows.Forms.Button()
         Me.CompressionCheckBox = New System.Windows.Forms.CheckBox()
         Me.MipMapCheckBox = New System.Windows.Forms.CheckBox()
@@ -30,7 +29,6 @@ Partial Class Form1
         Me.OneBitAlphaRB = New System.Windows.Forms.RadioButton()
         Me.EightBitAlphaRB = New System.Windows.Forms.RadioButton()
         Me.ExtendedHeaderCheckBox = New System.Windows.Forms.CheckBox()
-        Me.QualityCheckBox = New System.Windows.Forms.CheckBox()
         Me.GroupBox1 = New System.Windows.Forms.GroupBox()
         Me.GroupBox2 = New System.Windows.Forms.GroupBox()
         Me.Label1 = New System.Windows.Forms.Label()
@@ -47,7 +45,7 @@ Partial Class Form1
         Me.Button1.Name = "Button1"
         Me.Button1.Size = New System.Drawing.Size(182, 34)
         Me.Button1.TabIndex = 0
-        Me.Button1.Text = "Save"
+        Me.Button1.Text = "Convert"
         Me.Button1.UseVisualStyleBackColor = True
         '
         'CompressionCheckBox
@@ -77,7 +75,7 @@ Partial Class Form1
         '
         Me.NoAlphaRB.AutoSize = True
         Me.NoAlphaRB.Checked = True
-        Me.NoAlphaRB.Location = New System.Drawing.Point(97, 19)
+        Me.NoAlphaRB.Location = New System.Drawing.Point(97, 17)
         Me.NoAlphaRB.Name = "NoAlphaRB"
         Me.NoAlphaRB.Size = New System.Drawing.Size(69, 17)
         Me.NoAlphaRB.TabIndex = 5
@@ -88,7 +86,7 @@ Partial Class Form1
         'OneBitAlphaRB
         '
         Me.OneBitAlphaRB.AutoSize = True
-        Me.OneBitAlphaRB.Location = New System.Drawing.Point(97, 42)
+        Me.OneBitAlphaRB.Location = New System.Drawing.Point(97, 40)
         Me.OneBitAlphaRB.Name = "OneBitAlphaRB"
         Me.OneBitAlphaRB.Size = New System.Drawing.Size(75, 17)
         Me.OneBitAlphaRB.TabIndex = 6
@@ -98,7 +96,7 @@ Partial Class Form1
         'EightBitAlphaRB
         '
         Me.EightBitAlphaRB.AutoSize = True
-        Me.EightBitAlphaRB.Location = New System.Drawing.Point(97, 65)
+        Me.EightBitAlphaRB.Location = New System.Drawing.Point(97, 63)
         Me.EightBitAlphaRB.Name = "EightBitAlphaRB"
         Me.EightBitAlphaRB.Size = New System.Drawing.Size(75, 17)
         Me.EightBitAlphaRB.TabIndex = 7
@@ -117,23 +115,10 @@ Partial Class Form1
         Me.ExtendedHeaderCheckBox.Text = "DX10"
         Me.ExtendedHeaderCheckBox.UseVisualStyleBackColor = True
         '
-        'QualityCheckBox
-        '
-        Me.QualityCheckBox.AutoSize = True
-        Me.QualityCheckBox.Checked = True
-        Me.QualityCheckBox.CheckState = System.Windows.Forms.CheckState.Checked
-        Me.QualityCheckBox.Location = New System.Drawing.Point(6, 86)
-        Me.QualityCheckBox.Name = "QualityCheckBox"
-        Me.QualityCheckBox.Size = New System.Drawing.Size(83, 17)
-        Me.QualityCheckBox.TabIndex = 9
-        Me.QualityCheckBox.Text = "High Quality"
-        Me.QualityCheckBox.UseVisualStyleBackColor = True
-        '
         'GroupBox1
         '
         Me.GroupBox1.Controls.Add(Me.MipMapCheckBox)
         Me.GroupBox1.Controls.Add(Me.Button1)
-        Me.GroupBox1.Controls.Add(Me.QualityCheckBox)
         Me.GroupBox1.Controls.Add(Me.CompressionCheckBox)
         Me.GroupBox1.Controls.Add(Me.ExtendedHeaderCheckBox)
         Me.GroupBox1.Controls.Add(Me.NoAlphaRB)
@@ -183,7 +168,7 @@ Partial Class Form1
         Me.Button2.Name = "Button2"
         Me.Button2.Size = New System.Drawing.Size(182, 34)
         Me.Button2.TabIndex = 0
-        Me.Button2.Text = "Save"
+        Me.Button2.Text = "Convert"
         Me.Button2.UseVisualStyleBackColor = True
         '
         'Form1
@@ -214,7 +199,6 @@ Partial Class Form1
     Friend WithEvents OneBitAlphaRB As RadioButton
     Friend WithEvents EightBitAlphaRB As RadioButton
     Friend WithEvents ExtendedHeaderCheckBox As CheckBox
-    Friend WithEvents QualityCheckBox As CheckBox
     Friend WithEvents GroupBox1 As GroupBox
     Friend WithEvents GroupBox2 As GroupBox
     Friend WithEvents Button2 As Button

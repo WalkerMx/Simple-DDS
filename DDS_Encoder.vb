@@ -44,7 +44,6 @@ Public Class DDS_Encoder
     Private AlphaMode As Integer
     Private MipMapEnabled As Boolean
     Private CompressionEnabled As Boolean
-    Private HighQualityEnabled As Boolean
     Private ExtendedHeaderEnabled As Boolean
 
     Private MipCount As Integer
@@ -61,8 +60,7 @@ Public Class DDS_Encoder
     ''' <param name="Compress">Applies DXT1 or DXT5 compression depending on Alpha Mode.</param>
     ''' <param name="MipMaps">Create mipmaps for distant objects.  Increases file size by ~33%.</param>
     ''' <param name="ExtendedHeader">Add extended DX10 header.  Disable for legacy texture support.</param>
-    ''' <param name="HighQuality">Use advanced proccessing for compressing blocks at the cost speed.</param>
-    Public Sub New(Source As String, Alpha As Integer, Compress As Boolean, MipMaps As Boolean, ExtendedHeader As Boolean, Optional HighQuality As Boolean = True)
+    Public Sub New(Source As String, Alpha As Integer, Compress As Boolean, MipMaps As Boolean, ExtendedHeader As Boolean)
 
         ResourceDimension = DX10_ResourceDimension.D3D10_RESOURCE_DIMENSION_TEXTURE2D
         MiscFlag = DX10_MiscFlags.D3D10_RESOURCE_MISC_NONE
@@ -77,7 +75,6 @@ Public Class DDS_Encoder
         AlphaMode = Alpha
         MipMapEnabled = MipMaps
         CompressionEnabled = Compress
-        HighQualityEnabled = HighQuality
         ExtendedHeaderEnabled = ExtendedHeader
 
         BytesPerBlock = 8
@@ -123,7 +120,7 @@ Public Class DDS_Encoder
             Caps1 = Caps1 Or DDS_Caps1.DDSCAPS_MIPMAP
         End If
 
-        If ExtendedHeader = True Then
+        If ExtendedHeader Then
             FourCC = "DX10"
             RedBitMask = {0, 0, 0, 0}
             GreenBitMask = {0, 0, 0, 0}
@@ -141,7 +138,7 @@ Public Class DDS_Encoder
                         DXGIFormat = DXGI_Format.DXGI_FORMAT_BC1_UNORM
                         MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_STRAIGHT
                     Case 2
-                        DXGIFormat = DXGI_Format.DXGI_FORMAT_BC3_UNORM
+                        DXGIFormat = DXGI_Format.DXGI_FORMAT_BC7_UNORM
                         MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_STRAIGHT
                 End Select
             Else
@@ -158,6 +155,8 @@ Public Class DDS_Encoder
         End If
 
         WriteHeader()
+
+        ' BeginEncode()
 
     End Sub
 
@@ -261,43 +260,122 @@ Public Class DDS_Encoder
         Dim BlockWidth As Integer = Math.Max(1, (Width + 3) \ 4)
         Dim BlockHeight As Integer = Math.Max(1, (Height + 3) \ 4)
         Dim Result(BlockWidth * BlockHeight * BytesPerBlock - 1) As Byte
+        Dim IsBC7 As Boolean = (DXGIFormat = DXGI_Format.DXGI_FORMAT_BC7_UNORM)
+        Dim CutoutAlpha As Boolean = (AlphaMode = 1)
+        Dim FullAlpha As Boolean = (AlphaMode = 2)
         Parallel.For(0, BlockHeight, Options, Sub(yBlock)
                                                   Dim yPixelBase As Integer = yBlock * 4
                                                   Dim rowOutputOffset As Integer = yBlock * BlockWidth * BytesPerBlock
+                                                  Dim BlockData(63) As Byte
                                                   For xBlock As Integer = 0 To BlockWidth - 1
                                                       Dim xPixelBase As Integer = xBlock * 4
-                                                      Dim BlockColors As UShort() = New UShort(15) {}
-                                                      Dim BlockAlphas As Byte() = New Byte(15) {}
+                                                      Dim byteIdx As Integer = 0
                                                       For j As Integer = 0 To 3
                                                           Dim py As Integer = Math.Min(yPixelBase + j, Height - 1)
                                                           Dim rowInputOffset As Integer = py * Width * 4
                                                           For i As Integer = 0 To 3
                                                               Dim px As Integer = Math.Min(xPixelBase + i, Width - 1)
                                                               Dim pixelIdx As Integer = rowInputOffset + (px * 4)
-                                                              Dim b As Byte = SourceData(pixelIdx)
-                                                              Dim g As Byte = SourceData(pixelIdx + 1)
-                                                              Dim r As Byte = SourceData(pixelIdx + 2)
-                                                              Dim a As Byte = SourceData(pixelIdx + 3)
-                                                              BlockAlphas(j * 4 + i) = a
-                                                              If AlphaMode = 1 AndAlso a < 128 Then
-                                                                  BlockColors(j * 4 + i) = 0
-                                                              Else
-                                                                  BlockColors(j * 4 + i) = CType(((CInt(r) And &HF8) << 8) Or ((CInt(g) And &HFC) << 3) Or (CInt(b) >> 3), UShort)
-                                                              End If
+                                                              BlockData(byteIdx) = SourceData(pixelIdx)
+                                                              BlockData(byteIdx + 1) = SourceData(pixelIdx + 1)
+                                                              BlockData(byteIdx + 2) = SourceData(pixelIdx + 2)
+                                                              BlockData(byteIdx + 3) = SourceData(pixelIdx + 3)
+                                                              byteIdx += 4
                                                           Next
                                                       Next
                                                       Dim currentBlockOffset As Integer = rowOutputOffset + (xBlock * BytesPerBlock)
-                                                      If AlphaMode = 2 Then
-                                                          Array.Copy(EncodeAlphaBlockBC3(BlockAlphas), 0, Result, currentBlockOffset, 8)
-                                                          currentBlockOffset += 8
+                                                      If IsBC7 Then
+                                                          Array.Copy(EncodeBlockBC7(BlockData), 0, Result, currentBlockOffset, 16)
+                                                      Else
+                                                          If FullAlpha Then
+                                                              Array.Copy(EncodeAlphaBlockBC3(BlockData), 0, Result, currentBlockOffset, 8)
+                                                              currentBlockOffset += 8
+                                                          End If
+                                                          Array.Copy(EncodeColorBlockBC1(BlockData, Not CutoutAlpha), 0, Result, currentBlockOffset, 8)
                                                       End If
-                                                      Array.Copy(EncodeColorBlockBC1(BlockColors, AlphaMode <> 1, HighQualityEnabled), 0, Result, currentBlockOffset, 8)
                                                   Next
                                               End Sub)
         Return Result
     End Function
 
-    Private Function EncodeAlphaBlockBC3(AlphaArray As Byte()) As Byte()
+    Private Function EncodeBlockBC7(BlockData As Byte()) As Byte()
+        Dim Result(15) As Byte
+        Dim MinB As Integer = 255, MaxB As Integer = 0
+        Dim MinG As Integer = 255, MaxG As Integer = 0
+        Dim MinR As Integer = 255, MaxR As Integer = 0
+        Dim MinA As Integer = 255, MaxA As Integer = 0
+        For i As Integer = 0 To 15
+            Dim Offset As Integer = i * 4
+            Dim valB As Integer = BlockData(Offset)
+            Dim valG As Integer = BlockData(Offset + 1)
+            Dim valR As Integer = BlockData(Offset + 2)
+            Dim valA As Integer = BlockData(Offset + 3)
+            If valB < MinB Then MinB = valB
+            If valB > MaxB Then MaxB = valB
+            If valG < MinG Then MinG = valG
+            If valG > MaxG Then MaxG = valG
+            If valR < MinR Then MinR = valR
+            If valR > MaxR Then MaxR = valR
+            If valA < MinA Then MinA = valA
+            If valA > MaxA Then MaxA = valA
+        Next
+        Dim R0 As Integer = MinR >> 1, R1 As Integer = MaxR >> 1
+        Dim G0 As Integer = MinG >> 1, G1 As Integer = MaxG >> 1
+        Dim B0 As Integer = MinB >> 1, B1 As Integer = MaxB >> 1
+        Dim A0 As Integer = MinA >> 1, A1 As Integer = MaxA >> 1
+        Dim ColorTable(15) As ULong
+        Dim MinLum As Integer = MinB + (MinG << 1) + MinR + MinA
+        Dim MaxLum As Integer = MaxB + (MaxG << 1) + MaxR + MaxA
+        Dim Range As Single = If(MaxLum - MinLum < 1, 1.0F, CSng(MaxLum - MinLum))
+        For i As Integer = 0 To 15
+            Dim Offset As Integer = i * 4
+            Dim PixB As Integer = BlockData(Offset)
+            Dim PixG As Integer = BlockData(Offset + 1)
+            Dim PixR As Integer = BlockData(Offset + 2)
+            Dim PixA As Integer = BlockData(Offset + 3)
+            Dim PixLum As Integer = PixB + (PixG << 1) + PixR + PixA
+            Dim Index As Integer = CInt(Math.Round(((PixLum - MinLum) / Range) * 15.0F))
+            If Index > 15 Then Index = 15
+            If Index < 0 Then Index = 0
+            ColorTable(i) = CULng(Index)
+        Next
+        If ColorTable(0) >= 8UL Then
+            Dim Temp As Integer
+            Temp = R0 : R0 = R1 : R1 = Temp
+            Temp = G0 : G0 = G1 : G1 = Temp
+            Temp = B0 : B0 = B1 : B1 = Temp
+            Temp = A0 : A0 = A1 : A1 = Temp
+            For i As Integer = 0 To 15
+                ColorTable(i) = 15UL - ColorTable(i)
+            Next
+        End If
+        Dim LowBytes As ULong = 0
+        LowBytes = LowBytes Or &H40UL
+        LowBytes = LowBytes Or (CULng(R0) << 7)
+        LowBytes = LowBytes Or (CULng(R1) << 14)
+        LowBytes = LowBytes Or (CULng(G0) << 21)
+        LowBytes = LowBytes Or (CULng(G1) << 28)
+        LowBytes = LowBytes Or (CULng(B0) << 35)
+        LowBytes = LowBytes Or (CULng(B1) << 42)
+        LowBytes = LowBytes Or (CULng(A0) << 49)
+        LowBytes = LowBytes Or (CULng(A1) << 56)
+        LowBytes = LowBytes Or (1UL << 63)
+        Dim HighBytes As ULong = 0
+        HighBytes = HighBytes Or 1UL
+        HighBytes = HighBytes Or ((ColorTable(0) And 7UL) << 1)
+        For i As Integer = 1 To 15
+            HighBytes = HighBytes Or ((ColorTable(i) And 15UL) << (i * 4))
+        Next
+        Array.Copy(BitConverter.GetBytes(LowBytes), 0, Result, 0, 8)
+        Array.Copy(BitConverter.GetBytes(HighBytes), 0, Result, 8, 8)
+        Return Result
+    End Function
+
+    Private Function EncodeAlphaBlockBC3(BlockData As Byte()) As Byte()
+        Dim AlphaArray(15) As Byte
+        For i As Integer = 0 To 15
+            AlphaArray(i) = BlockData((i * 4) + 3)
+        Next
         Dim Result(7) As Byte
         Dim Alpha0 As Byte = AlphaArray.Max()
         Dim Alpha1 As Byte = AlphaArray.Min()
@@ -335,23 +413,27 @@ Public Class DDS_Encoder
         Return Result
     End Function
 
-    Private Function EncodeColorBlockBC1(PixelArray As UShort(), ForceOpaque As Boolean, HighQuality As Boolean) As Byte()
-        Dim Col0 As UShort
-        Dim Col1 As UShort
-        If Not HighQuality Then
-            Col0 = PixelArray(0) : Col1 = PixelArray(0)
-            For Each Pixel In PixelArray
-                If Pixel > Col0 Then Col0 = Pixel Else If Pixel < Col1 Then Col1 = Pixel
-            Next
-        Else
-            Dim MaxLum As Double = -1.0
-            Dim MinLum As Double = 1000.0
-            For Each Pixel In PixelArray
-                Dim Lum As Double = (0.299 * ((Pixel >> 11) << 3)) + (0.587 * (((Pixel >> 5) And &H3F) << 2)) + (0.114 * ((Pixel And &H1F) << 3))
-                If Lum > MaxLum Then MaxLum = Lum : Col0 = Pixel
-                If Lum < MinLum Then MinLum = Lum : Col1 = Pixel
-            Next
-        End If
+    Private Function EncodeColorBlockBC1(BlockData As Byte(), ForceOpaque As Boolean) As Byte()
+        Dim PixelArray(15) As UShort
+        For i As Integer = 0 To 15
+            Dim offset As Integer = i * 4
+            Dim b As Integer = BlockData(offset)
+            Dim g As Integer = BlockData(offset + 1)
+            Dim r As Integer = BlockData(offset + 2)
+            Dim a As Integer = BlockData(offset + 3)
+            If Not ForceOpaque AndAlso a < 128 Then
+                PixelArray(i) = 0
+            Else
+                PixelArray(i) = CUShort(((r And &HF8) << 8) Or ((g And &HFC) << 3) Or (b >> 3))
+            End If
+        Next
+        Dim Col0 As UShort, Col1 As UShort
+        Dim MaxLum As Double = -1.0, MinLum As Double = 1000.0
+        For Each Pixel In PixelArray
+            Dim Lum As Double = (0.299 * ((Pixel >> 11) << 3)) + (0.587 * (((Pixel >> 5) And &H3F) << 2)) + (0.114 * ((Pixel And &H1F) << 3))
+            If Lum > MaxLum Then MaxLum = Lum : Col0 = Pixel
+            If Lum < MinLum Then MinLum = Lum : Col1 = Pixel
+        Next
         If ForceOpaque Then
             If Col0 < Col1 Then
                 Swap(Col0, Col1)
@@ -367,9 +449,7 @@ Public Class DDS_Encoder
         ElseIf Col0 > Col1 Then
             Swap(Col0, Col1)
         End If
-        Dim RVals(3) As Integer
-        Dim GVals(3) As Integer
-        Dim BVals(3) As Integer
+        Dim RVals(3) As Integer, GVals(3) As Integer, BVals(3) As Integer
         RVals(0) = (Col0 >> 11) << 3 : GVals(0) = ((Col0 >> 5) And &H3F) << 2 : BVals(0) = (Col0 And &H1F) << 3
         RVals(1) = (Col1 >> 11) << 3 : GVals(1) = ((Col1 >> 5) And &H3F) << 2 : BVals(1) = (Col1 And &H1F) << 3
         If ForceOpaque Then
@@ -379,14 +459,11 @@ Public Class DDS_Encoder
             RVals(2) = (RVals(0) + RVals(1)) \ 2 : GVals(2) = (GVals(0) + GVals(1)) \ 2 : BVals(2) = (BVals(0) + BVals(1)) \ 2
         End If
         Dim ColorTable As UInteger = 0
-        Dim Midpoint As Integer = ((Col0 And &HF7DE) >> 1) + ((Col1 And &HF7DE) >> 1)
         For i As Integer = 0 To 15
             Dim Pixel As UShort = PixelArray(i)
             Dim Index As UInteger = 0
             If Not ForceOpaque AndAlso Pixel = 0 Then
                 Index = 3
-            ElseIf Not HighQuality Then
-                If Pixel = Col0 Then Index = 0 Else If Pixel = Col1 Then Index = 1 Else Index = If(Pixel > Midpoint, 2, 3)
             Else
                 Dim PixR As UShort = (Pixel >> 11) << 3
                 Dim PixG As UShort = ((Pixel >> 5) And &H3F) << 2

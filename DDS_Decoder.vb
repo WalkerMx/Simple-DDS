@@ -32,7 +32,7 @@ Public Class DDS_Decoder
     Public AlphaBitMask As Integer
 
     Public Caps1 As DDS_Caps1
-    Public Caps2 As Integer
+    Public Caps2 As DDS_Caps2
 
     Public DXGIFormat As DXGI_Format
     Public ResourceDimension As DX10_ResourceDimension
@@ -49,6 +49,7 @@ Public Class DDS_Decoder
     Public Sub New(Source As String)
         FilePath = Source
         ReadHeader(Source)
+        ' BeginDecode()
     End Sub
 
     Private Sub ReadHeader(Source As String)

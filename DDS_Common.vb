@@ -5,7 +5,7 @@
 
 Public Module DDS_Common
 
-    Public ReadOnly Options As New ParallelOptions With {.MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount \ 2)}
+    Public ReadOnly Options As New ParallelOptions With {.MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount - 1)}
 
     <Flags>
     Public Enum DDS_SurfaceFlags
