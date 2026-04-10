@@ -88,6 +88,48 @@ Public Module DDS_Common
         DDS_ALPHA_MODE_CUSTOM = &H4
     End Enum
 
+    Public ReadOnly Weight2() As Integer = {0, 21, 43, 64}
+    Public ReadOnly Weight3() As Integer = {0, 9, 18, 27, 37, 46, 55, 64}
+    Public ReadOnly Weight4() As Integer = {0, 4, 9, 13, 17, 21, 26, 30, 34, 38, 43, 47, 51, 55, 60, 64}
+
+    Public ReadOnly AnchorIndexTable2() As Integer = {
+        15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+        15, 2, 8, 2, 2, 8, 8, 15, 2, 8, 2, 2, 8, 8, 2, 2,
+        15, 15, 6, 8, 2, 8, 15, 15, 2, 8, 2, 2, 2, 15, 15, 6,
+        6, 2, 6, 8, 15, 15, 2, 2, 15, 15, 15, 15, 15, 2, 2, 15}
+
+    Public ReadOnly AnchorIndexTable3_1() As Integer = {
+        3, 3, 15, 15, 8, 3, 15, 15, 8, 8, 6, 6, 6, 5, 3, 3,
+        3, 3, 8, 15, 3, 3, 6, 10, 5, 8, 8, 6, 8, 5, 12, 12,
+        8, 8, 5, 5, 3, 15, 3, 5, 6, 10, 6, 6, 10, 8, 5, 5,
+        15, 3, 15, 5, 15, 15, 15, 15, 3, 15, 5, 5, 5, 8, 5, 10}
+
+    Public ReadOnly AnchorIndexTable3_2() As Integer = {
+        15, 8, 8, 3, 15, 15, 3, 8, 15, 15, 15, 15, 15, 15, 15, 8,
+        15, 8, 15, 3, 15, 8, 15, 8, 3, 15, 6, 10, 15, 15, 10, 8,
+        15, 3, 15, 10, 10, 8, 9, 10, 6, 15, 8, 15, 3, 6, 6, 8,
+        15, 3, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 3, 15, 15, 8}
+
+    Public ReadOnly PartitionTable2() As Integer = {
+        &HCCCC, &H8888, &HEEEE, &HECC8, &HC880, &HFEEC, &HFEC8, &HEC80,
+        &HC800, &HFFEC, &HFE80, &HE800, &HFFE8, &HFF00, &HFFF0, &HF000,
+        &HF710, &H8E, &H7100, &H8CE, &H8C, &H7310, &H3100, &H8CCE,
+        &H88C, &H3110, &H6666, &H366C, &H17E8, &HFF0, &H718E, &H399C,
+        &HAAAA, &HF0F0, &H5A5A, &H33CC, &H3C3C, &H55AA, &H9696, &HA55A,
+        &H73CE, &H13C8, &H324C, &H3BDC, &H6996, &HC33C, &H9966, &H660,
+        &H272, &H4E4, &H4E40, &H2720, &HC936, &H936C, &H39C6, &H639C,
+        &H9336, &H9CC6, &H817E, &HE718, &HCCF0, &HFCC, &H7744, &HEE22}
+
+    Public ReadOnly PartitionTable3() As UInteger = {
+        &HAA685050UI, &H6A5A5040UI, &H5A5A4200UI, &H5450A0A8UI, &HA5A50000UI, &HA0A05050UI, &H5555A0A0UI, &H5A5A5050UI,
+        &HAA550000UI, &HAA555500UI, &HAAAA5500UI, &H90909090UI, &H94949494UI, &HA4A4A4A4UI, &HA9A59450UI, &H2A0A4250UI,
+        &HA5945040UI, &HA425054UI, &HA5A5A500UI, &H55A0A0A0UI, &HA8A85454UI, &H6A6A4040UI, &HA4A45000UI, &H1A1A0500UI,
+        &H50A4A4UI, &HAAA59090UI, &H14696914UI, &H69691400UI, &HA08585A0UI, &HAA821414UI, &H50A4A450UI, &H6A5A0200UI,
+        &HA9A58000UI, &H5090A0A8UI, &HA8A09050UI, &H24242424UI, &HAA5500UI, &H24924924UI, &H24499224UI, &H50A50A50UI,
+        &H500AA550UI, &HAAAA4444UI, &H66660000UI, &HA5A0A5A0UI, &H50A050A0UI, &H69286928UI, &H44AAAA44UI, &H66666600UI,
+        &HAA444444UI, &H54A854A8UI, &H95809580UI, &H96969600UI, &HA85454A8UI, &H80959580UI, &HAA141414UI, &H96960000UI,
+        &HAAAA1414UI, &HA05050A0UI, &HA0A5A5A0UI, &H96000000UI, &H40804080UI, &HA9A8A9A8UI, &HAAAAAA44UI, &H2A4A5254UI}
+
     Public Function Clamp(Value As Integer, MinValue As Integer, MaxValue As Integer) As Integer
         Return Math.Max(MinValue, Math.Min(Value, MaxValue))
     End Function

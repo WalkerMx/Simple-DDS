@@ -156,7 +156,7 @@ Public Class DDS_Encoder
 
         WriteHeader()
 
-        ' BeginEncode()
+        BeginEncode()
 
     End Sub
 
