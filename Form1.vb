@@ -4,7 +4,7 @@ Imports System.Drawing.Imaging
 
 Public Class Form1
 
-    Dim Bench As Boolean = True
+    Dim Bench As Boolean = False
     Dim BenchTime As Integer
     Dim BenchTimer As Stopwatch
 
@@ -22,24 +22,32 @@ Public Class Form1
                 InfoTextBox.Clear()
                 If PreviewImage IsNot Nothing Then PreviewImage.Dispose()
                 FilePath = OFD.FileName
+                Dim ResultText As String = ""
                 If Extension = ".dds" Then
-                    Using DDSDecoder As New DDS_Decoder(OFD.FileName)
-                        If Bench Then
-                            BenchTime = 0
-                            BenchTimer = Stopwatch.StartNew
-                            For i = 0 To 49
-                                DDSDecoder.BeginDecode()
-                            Next
-                            BenchTimer.Stop()
-                            BenchTime = BenchTimer.ElapsedMilliseconds
-                            MsgBox($"Average: {BenchTime / 50}ms")
-                        Else
-                            InfoTextBox.Text = GetDDSReport(DDSDecoder)
-                            PreviewImage = Await Task.Run(Function() DDSDecoder.GetPreviewImage())
-                        End If
-                    End Using
-                    DDSExportGroup.Enabled = False
-                    ImageExportGroup.Enabled = True
+                    Try
+                        Using DDSDecoder As New DDS_Decoder(OFD.FileName)
+                            If Bench Then
+                                BenchTime = 0
+                                BenchTimer = Stopwatch.StartNew
+                                For i = 0 To 49
+                                    DDSDecoder.BeginDecode()
+                                Next
+                                BenchTimer.Stop()
+                                BenchTime = BenchTimer.ElapsedMilliseconds
+                                MsgBox($"Average: {BenchTime / 50}ms")
+                            Else
+                                InfoTextBox.Text = GetDDSReport(DDSDecoder)
+                                PreviewImage = Await Task.Run(Function() DDSDecoder.ToBitmap())
+                            End If
+                        End Using
+                        DDSExportGroup.Enabled = False
+                        ImageExportGroup.Enabled = True
+                    Catch ex As Exception
+                        MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation)
+                        DDSExportGroup.Enabled = False
+                        ImageExportGroup.Enabled = False
+                        PreviewImage = New Bitmap(1, 1)
+                    End Try
                 Else
                     Using TempImage As Image = Image.FromFile(OFD.FileName)
                         InfoTextBox.Text = GetImageReport(TempImage)
@@ -91,7 +99,7 @@ Public Class Form1
                         BenchTime = BenchTimer.ElapsedMilliseconds
                         MsgBox($"Average: {BenchTime / 50}ms")
                     Else
-                        Await Task.Run(Sub() DDSEncoder.SaveImage(SFD.FileName))
+                        Await Task.Run(Sub() DDSEncoder.Save(SFD.FileName))
                     End If
                 End Using
                 ExportDDSButton.Enabled = True
