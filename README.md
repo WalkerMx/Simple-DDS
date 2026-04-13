@@ -18,7 +18,7 @@ A lightweight, fully managed DDS encoder and decoder. Simple-DDS provides a zero
 
 Comparison testing was done on a Xeon E3-1260L, strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses BC7 Mode 6 only, for fast, high-quality block compression.
 
-| | texconv | Simple-DDS | Delta |
+| | TexConv | Simple-DDS | Delta |
 | :--- | :--- | :--- | :--- |
 | BC1 No Mips | 663.34ms | 821.58ms | 1.2x Slower |
 | BC1 Full Mips | 1,229.55ms | 1,413.32ms | 1.1x Slower |
@@ -33,15 +33,13 @@ Comparison testing was done on a Xeon E3-1260L, strictly on the CPU.  Results ar
 
 ## Quality
 
-| | texconv BC7 | Simple-DDS BC7 | texconv BC1/3 | Simple-DDS BC1/3 |
+Kodak Lossless TrueColor Image Suite SSIM Benchmark (24 Images)
+
+| | TexConv BC7 | Simple-DDS BC7 | TexConv BC3 | Simple-DDS BC3 |
 | :--- | :--- | :--- | :--- | :--- |
-| 4K Opaque MSE | 2.7 | 3.6 | 15.1 | 23.783 |
-| 4K Opaque PSNR | 43.9 | 42.5 | 36.3 | 34.4 |
-| 4K Opaque SSIM | 0.9915 | 0.9878 | 0.9536 | 0.9377 |
-| | | | | |
-| 4K Alpha MSE | 209.2 | 162.2 | 62.9 | 120.8 |
-| 4K Alpha PNSR | 24.9 | 26 | 30.1 | 27.3 |
-| 4K Alpha SSIM | 0.9153 | 0.9271 | 0.9597 | 0.9301 |
+| **Average** | 0.9909 | 0.9858 | 0.9561 | 0.9454 |
+| **Worst-Case** | 0.9862 | 0.9684 | 0.9427 | 0.9248 |
+> SSIM Reference: 1.0 = Lossless | >0.98 = Indistinguishable | >0.95 = Excellent | >0.90 = Acceptable
 
 ## Usage Examples
 
