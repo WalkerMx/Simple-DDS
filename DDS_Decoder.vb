@@ -98,7 +98,7 @@ Public Class DDS_Decoder
 
     End Sub
 
-    Public Sub BeginDecode()
+    Private Sub BeginDecode()
         Dim AlphaMode As Integer = 0
         Dim CompressionMode As Integer = 0
         Dim BytesToRead As Integer = 0

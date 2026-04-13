@@ -218,7 +218,7 @@ Public Class DDS_Encoder
 
     End Sub
 
-    Public Sub BeginEncode()
+    Private Sub BeginEncode()
         Dim TempBytes As Byte()
         Dim TempWidth As Integer = Width
         Dim TempHeight As Integer = Height
