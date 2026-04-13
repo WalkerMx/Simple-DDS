@@ -42,14 +42,13 @@ Public Class DDS_Decoder
 
     Public ExtendedHeader As Boolean
 
+    Private FilePath As String
     Private SourceBytes As Byte()
     Private DecodedBytes As Byte()
-    Private FilePath As String
 
     Public Sub New(Source As String)
         FilePath = Source
         ReadHeader(Source)
-        BeginDecode()
     End Sub
 
     Private Sub ReadHeader(Source As String)
@@ -99,21 +98,22 @@ Public Class DDS_Decoder
 
     End Sub
 
-    Private Sub BeginDecode()
-
+    Public Sub BeginDecode()
         Dim AlphaMode As Integer = 0
         Dim CompressionMode As Integer = 0
         Dim BytesToRead As Integer = 0
         Dim DataOffset As Integer = 128
-
         If ExtendedHeader Then
             DataOffset = 148
             Select Case DXGIFormat
                 Case DXGI_Format.DXGI_FORMAT_BC1_UNORM
                     CompressionMode = If(MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_OPAQUE, 0, 1)
                     BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 8
-                Case DXGI_Format.DXGI_FORMAT_BC3_UNORM
+                Case DXGI_Format.DXGI_FORMAT_BC2_UNORM
                     CompressionMode = 2
+                    BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 16
+                Case DXGI_Format.DXGI_FORMAT_BC3_UNORM
+                    CompressionMode = 3
                     BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 16
                 Case DXGI_Format.DXGI_FORMAT_BC4_UNORM
                     CompressionMode = 4
@@ -145,8 +145,11 @@ Public Class DDS_Decoder
                             CompressionMode = 0
                         End If
                         BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 8
-                    Case "DXT5"
+                    Case "DXT3"
                         CompressionMode = 2
+                        BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 16
+                    Case "DXT5"
+                        CompressionMode = 3
                         BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 16
                     Case "ATI1", "BC4U"
                         CompressionMode = 4
@@ -169,48 +172,37 @@ Public Class DDS_Decoder
                 Throw New Exception("Unknown Format Error!")
             End If
         End If
-
         If BytesToRead > 0 Then
             SourceBytes = GetFileBytes(FilePath, DataOffset, BytesToRead)
         End If
-
         If CompressionMode = -1 Then
             DecodeUncompressed(AlphaMode)
         Else
             DecodeCompressed(CompressionMode)
         End If
-
     End Sub
 
     Private Sub DecodeUncompressed(AlphaMode As Integer)
         Dim bytesPerPixel As Integer = RGBBitCount \ 8
         Dim RowPitch As Integer = 0
-
         If (SurfaceFlags And DDS_SurfaceFlags.DDSD_PITCH) = DDS_SurfaceFlags.DDSD_PITCH Then
             RowPitch = PitchLinearSize
         Else
             RowPitch = (Width * bytesPerPixel + 3) And Not 3
         End If
-
         Dim rShift As Integer = GetShiftCount(RedBitMask)
         Dim gShift As Integer = GetShiftCount(GreenBitMask)
         Dim bShift As Integer = GetShiftCount(BlueBitMask)
         Dim aShift As Integer = GetShiftCount(AlphaBitMask)
-
         Dim DecodeAlpha As Boolean = (AlphaMode > 0) AndAlso (AlphaBitMask <> 0)
-
         DecodedBytes = New Byte(Width * Height * 4 - 1) {}
-
         Parallel.For(0, Height, Options, Sub(y)
                                              Dim SourceRowStart As Integer = y * RowPitch
                                              Dim DestRowStart As Integer = y * Width * 4
-
                                              For x As Integer = 0 To Width - 1
                                                  Dim SourceIndex As Integer = SourceRowStart + (x * bytesPerPixel)
                                                  Dim DestIndex As Integer = DestRowStart + (x * 4)
-
                                                  If SourceIndex + bytesPerPixel > SourceBytes.Length Then Continue For
-
                                                  Dim pixelValue As UInteger = 0
                                                  If bytesPerPixel = 4 Then
                                                      pixelValue = BitConverter.ToUInt32(SourceBytes, SourceIndex)
@@ -219,11 +211,9 @@ Public Class DDS_Decoder
                                                  ElseIf bytesPerPixel = 2 Then
                                                      pixelValue = BitConverter.ToUInt16(SourceBytes, SourceIndex)
                                                  End If
-
                                                  DecodedBytes(DestIndex) = CByte((pixelValue And CUInt(BlueBitMask)) >> bShift)
                                                  DecodedBytes(DestIndex + 1) = CByte((pixelValue And CUInt(GreenBitMask)) >> gShift)
                                                  DecodedBytes(DestIndex + 2) = CByte((pixelValue And CUInt(RedBitMask)) >> rShift)
-
                                                  If DecodeAlpha Then
                                                      DecodedBytes(DestIndex + 3) = CByte((pixelValue And CUInt(AlphaBitMask)) >> aShift)
                                                  Else
@@ -234,96 +224,207 @@ Public Class DDS_Decoder
     End Sub
 
     Private Sub DecodeCompressed(CompressionMode As Integer)
-
         Dim BlockWidth As Integer = (Width + 3) \ 4
         Dim BlockHeight As Integer = (Height + 3) \ 4
-
-        Dim BytesPerBlock As Integer = If(CompressionMode = 0 OrElse CompressionMode = 1, 8, 16)
-
+        Dim BytesPerBlock As Integer = If(CompressionMode = 0 OrElse CompressionMode = 1 OrElse CompressionMode = 4, 8, 16)
         DecodedBytes = New Byte(Width * Height * 4 - 1) {}
 
         Parallel.For(0, BlockHeight, Options, Sub(yBlock)
-                                                  Dim BlockPixels(63) As Byte
+                                                  Dim yPixelBase As Integer = yBlock * 4
 
                                                   For xBlock As Integer = 0 To BlockWidth - 1
+                                                      Dim xPixelBase As Integer = xBlock * 4
                                                       Dim SourceIndex As Integer = (yBlock * BlockWidth + xBlock) * BytesPerBlock
 
                                                       Select Case CompressionMode
                                                           Case 0, 1 ' BC1 / BC1a
-                                                              DecodeColorBlock(SourceIndex, BlockPixels, CompressionMode)
-
-                                                          Case 2 ' BC3
-                                                              DecodeColorBlock(SourceIndex + 8, BlockPixels, CompressionMode)
-                                                              DecodeSingleChannelBlock(SourceIndex, BlockPixels, 3)
-
-                                                          Case 4 ' BC4 
-                                                              DecodeSingleChannelBlock(SourceIndex, BlockPixels, 2)
-
-                                                          Case 5 ' BC5 
-                                                              DecodeSingleChannelBlock(SourceIndex, BlockPixels, 2)
-                                                              DecodeSingleChannelBlock(SourceIndex + 8, BlockPixels, 1)
-
+                                                              DecodeBlockBC1(SourceIndex, xPixelBase, yPixelBase, CompressionMode)
+                                                          Case 2 ' BC2
+                                                              DecodeBlockBC1(SourceIndex + 8, xPixelBase, yPixelBase, CompressionMode)
+                                                              DecodeBlockBC2(SourceIndex, xPixelBase, yPixelBase)
+                                                          Case 3 ' BC3
+                                                              DecodeBlockBC1(SourceIndex + 8, xPixelBase, yPixelBase, CompressionMode)
+                                                              DecodeBlockBC3(SourceIndex, xPixelBase, yPixelBase, 3)
+                                                          Case 4 ' BC4
+                                                              DecodeBlockBC3(SourceIndex, xPixelBase, yPixelBase, 2)
+                                                              DecodeBlockBC4(xPixelBase, yPixelBase)
+                                                          Case 5 ' BC5
+                                                              DecodeBlockBC3(SourceIndex, xPixelBase, yPixelBase, 2)
+                                                              DecodeBlockBC3(SourceIndex + 8, xPixelBase, yPixelBase, 1)
+                                                              DecodeBlockBC5(xPixelBase, yPixelBase)
                                                           Case 7 ' BC7
-                                                              DecodeBlockBC7(SourceIndex, BlockPixels)
+                                                              DecodeBlockBC7(SourceIndex, xPixelBase, yPixelBase)
                                                       End Select
-
-                                                      For i As Integer = 0 To 15
-                                                          Dim py As Integer = (yBlock * 4) + (i >> 2)
-                                                          Dim px As Integer = (xBlock * 4) + (i And 3)
-
-                                                          If px < Width AndAlso py < Height Then
-                                                              Dim destIdx As Integer = (py * Width + px) * 4
-                                                              Dim srcIdx As Integer = i * 4
-
-                                                              DecodedBytes(destIdx) = BlockPixels(srcIdx)
-                                                              DecodedBytes(destIdx + 1) = BlockPixels(srcIdx + 1)
-                                                              DecodedBytes(destIdx + 2) = BlockPixels(srcIdx + 2)
-                                                              DecodedBytes(destIdx + 3) = BlockPixels(srcIdx + 3)
-                                                          End If
-                                                      Next
                                                   Next
                                               End Sub)
     End Sub
 
-    Private Sub DecodeBlockBC7(Offset As Integer, BlockPixels() As Byte)
-        Dim BlockData(15) As Byte
-        Array.Copy(SourceBytes, Offset, BlockData, 0, 16)
-        Dim BitPos As Integer = 0
-        Dim Mode As Integer = -1
-        For i As Integer = 0 To 7
-            If ReadBits(BlockData, BitPos, 1) = 1 Then
-                Mode = i
-                Exit For
-            End If
-        Next
+
+    Private Sub DecodeBlockBC7(Offset As Integer, xPixelBase As Integer, yPixelBase As Integer)
+        Dim Mode As Integer = ModeLUT(SourceBytes(Offset))
+        Dim BitPos As Integer = Mode + 1
         Select Case Mode
-            Case 0 : DecodeMode0(BlockData, BitPos, BlockPixels)
-            Case 1 : DecodeMode1(BlockData, BitPos, BlockPixels)
-            Case 2 : DecodeMode2(BlockData, BitPos, BlockPixels)
-            Case 3 : DecodeMode3(BlockData, BitPos, BlockPixels)
-            Case 4 : DecodeMode4(BlockData, BitPos, BlockPixels)
-            Case 5 : DecodeMode5(BlockData, BitPos, BlockPixels)
-            Case 6 : DecodeMode6(BlockData, BitPos, BlockPixels)
-            Case 7 : DecodeMode7(BlockData, BitPos, BlockPixels)
+            Case 0 : DecodeMode0(Offset, BitPos, xPixelBase, yPixelBase)
+            Case 1 : DecodeMode1(Offset, BitPos, xPixelBase, yPixelBase)
+            Case 2 : DecodeMode2(Offset, BitPos, xPixelBase, yPixelBase)
+            Case 3 : DecodeMode3(Offset, BitPos, xPixelBase, yPixelBase)
+            Case 4 : DecodeMode4(Offset, BitPos, xPixelBase, yPixelBase)
+            Case 5 : DecodeMode5(Offset, BitPos, xPixelBase, yPixelBase)
+            Case 6 : DecodeMode6(Offset, BitPos, xPixelBase, yPixelBase)
+            Case 7 : DecodeMode7(Offset, BitPos, xPixelBase, yPixelBase)
             Case Else
-                DecodeModeDiagnostic(BlockData, BitPos, BlockPixels)
+                DecodeModeDiagnostic(Offset, BitPos, xPixelBase, yPixelBase)
         End Select
     End Sub
 
-    Private Sub DecodeMode0(BlockData() As Byte, ByRef BitPos As Integer, BlockPixels() As Byte)
-        Dim Partition As Integer = ReadBits(BlockData, BitPos, 4)
+    Private Sub DecodeBlockBC5(xPixelBase As Integer, yPixelBase As Integer)
+        For i As Integer = 0 To 15
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                Dim RVal As Integer = DecodedBytes(destIdx + 2)
+                Dim GVal As Integer = DecodedBytes(destIdx + 1)
+                Dim dX As Integer = RVal - 128
+                Dim dY As Integer = GVal - 128
+                Dim dSq As Integer = (dX * dX) + (dY * dY)
+                Dim BVal As Integer = 255 - (dSq >> 7)
+                If BVal < 128 Then BVal = 128
+                If BVal > 255 Then BVal = 255
+                DecodedBytes(destIdx + 0) = CByte(BVal)
+                DecodedBytes(destIdx + 3) = 255
+            End If
+        Next
+    End Sub
+
+    Private Sub DecodeBlockBC4(xPixelBase As Integer, yPixelBase As Integer)
+        For i As Integer = 0 To 15
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                Dim RVal As Byte = DecodedBytes(destIdx + 2)
+                DecodedBytes(destIdx) = RVal
+                DecodedBytes(destIdx + 1) = RVal
+                DecodedBytes(destIdx + 3) = 255
+            End If
+        Next
+    End Sub
+
+    Private Sub DecodeBlockBC3(Offset As Integer, xPixelBase As Integer, yPixelBase As Integer, TargetChannel As Integer)
+        Dim aPal(7) As Byte
+        Dim a0 As Byte = SourceBytes(Offset)
+        Dim a1 As Byte = SourceBytes(Offset + 1)
+        aPal(0) = a0
+        aPal(1) = a1
+        If a0 > a1 Then
+            For i As Integer = 1 To 6
+                aPal(i + 1) = CByte(((7 - i) * CInt(a0) + i * CInt(a1)) \ 7)
+            Next
+        Else
+            For i As Integer = 1 To 4
+                aPal(i + 1) = CByte(((5 - i) * CInt(a0) + i * CInt(a1)) \ 5)
+            Next
+            aPal(6) = 0
+            aPal(7) = 255
+        End If
+        Dim AlphaTable As ULong = 0
+        For i As Integer = 0 To 5
+            AlphaTable = AlphaTable Or (CType(SourceBytes(Offset + 2 + i), ULong) << (i * 8))
+        Next
+        For i As Integer = 0 To 15
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = ((pY * Width + pX) * 4)
+                Dim aIdx As Integer = CInt((AlphaTable >> (i * 3)) And 7UL)
+                DecodedBytes(destIdx + TargetChannel) = aPal(aIdx)
+                If TargetChannel <> 3 Then
+                    DecodedBytes(destIdx + 3) = 255
+                End If
+            End If
+        Next
+    End Sub
+
+    Private Sub DecodeBlockBC2(Offset As Integer, xPixelBase As Integer, yPixelBase As Integer)
+        For byteIdx As Integer = 0 To 7
+            Dim packedByte As Byte = SourceBytes(Offset + byteIdx)
+            For nibble As Integer = 0 To 1
+                Dim nibIdx As Integer = (byteIdx * 2) + nibble
+                Dim pX As Integer = xPixelBase + (nibIdx And 3)
+                Dim pY As Integer = yPixelBase + (nibIdx >> 2)
+                If pX < Width AndAlso pY < Height Then
+                    Dim destIdx As Integer = (pY * Width + pX) * 4
+                    Dim alpha4Bit As Byte
+                    If nibble = 0 Then
+                        alpha4Bit = CByte(packedByte And &HF)
+                    Else
+                        alpha4Bit = CByte((packedByte >> 4) And &HF)
+                    End If
+                    DecodedBytes(destIdx + 3) = CByte((alpha4Bit << 4) Or alpha4Bit)
+                End If
+            Next
+        Next
+    End Sub
+
+    Private Sub DecodeBlockBC1(Offset As Integer, xPixelBase As Integer, yPixelBase As Integer, ActiveMode As Integer)
+        Dim c0_raw As UShort = BitConverter.ToUInt16(SourceBytes, Offset)
+        Dim c1_raw As UShort = BitConverter.ToUInt16(SourceBytes, Offset + 2)
+        Dim ColorTable As UInteger = BitConverter.ToUInt32(SourceBytes, Offset + 4)
+        Dim cPal(3, 3) As Byte
+        Dim p0() As Byte = Unpack565(c0_raw)
+        Dim p1() As Byte = Unpack565(c1_raw)
+        cPal(0, 0) = p0(0) : cPal(0, 1) = p0(1) : cPal(0, 2) = p0(2) : cPal(0, 3) = 255
+        cPal(1, 0) = p1(0) : cPal(1, 1) = p1(1) : cPal(1, 2) = p1(2) : cPal(1, 3) = 255
+        If ActiveMode >= 2 OrElse c0_raw > c1_raw Then
+            cPal(2, 0) = CByte((CInt(cPal(0, 0)) * 2 + cPal(1, 0)) \ 3)
+            cPal(2, 1) = CByte((CInt(cPal(0, 1)) * 2 + cPal(1, 1)) \ 3)
+            cPal(2, 2) = CByte((CInt(cPal(0, 2)) * 2 + cPal(1, 2)) \ 3)
+            cPal(2, 3) = 255
+
+            cPal(3, 0) = CByte((CInt(cPal(0, 0)) + cPal(1, 0) * 2) \ 3)
+            cPal(3, 1) = CByte((CInt(cPal(0, 1)) + cPal(1, 1) * 2) \ 3)
+            cPal(3, 2) = CByte((CInt(cPal(0, 2)) + cPal(1, 2) * 2) \ 3)
+            cPal(3, 3) = 255
+        Else
+            cPal(2, 0) = CByte((CInt(cPal(0, 0)) + cPal(1, 0)) \ 2)
+            cPal(2, 1) = CByte((CInt(cPal(0, 1)) + cPal(1, 1)) \ 2)
+            cPal(2, 2) = CByte((CInt(cPal(0, 2)) + cPal(1, 2)) \ 2)
+            cPal(2, 3) = 255
+
+            cPal(3, 0) = 0 : cPal(3, 1) = 0 : cPal(3, 2) = 0
+            cPal(3, 3) = CByte(If(ActiveMode = 1, 0, 255))
+        End If
+        For i As Integer = 0 To 15
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim cIdx As Integer = CInt((ColorTable >> (i * 2)) And 3UI)
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                DecodedBytes(destIdx) = cPal(cIdx, 0)
+                DecodedBytes(destIdx + 1) = cPal(cIdx, 1)
+                DecodedBytes(destIdx + 2) = cPal(cIdx, 2)
+                DecodedBytes(destIdx + 3) = cPal(cIdx, 3)
+            End If
+        Next
+    End Sub
+
+#Region "BC7 Modes"
+
+    Private Sub DecodeMode0(Offset As Integer, ByRef BitPos As Integer, xPixelBase As Integer, yPixelBase As Integer)
+        Dim Partition As Integer = ReadBits(Offset, BitPos, 4)
         Dim R(5), G(5), B(5), P(5) As Integer
         For i As Integer = 0 To 5
-            R(i) = ReadBits(BlockData, BitPos, 4)
+            R(i) = ReadBits(Offset, BitPos, 4)
         Next
         For i As Integer = 0 To 5
-            G(i) = ReadBits(BlockData, BitPos, 4)
+            G(i) = ReadBits(Offset, BitPos, 4)
         Next
         For i As Integer = 0 To 5
-            B(i) = ReadBits(BlockData, BitPos, 4)
+            B(i) = ReadBits(Offset, BitPos, 4)
         Next
         For i As Integer = 0 To 5
-            P(i) = ReadBits(BlockData, BitPos, 1)
+            P(i) = ReadBits(Offset, BitPos, 1)
         Next
         For i As Integer = 0 To 5
             R(i) = (R(i) << 1) Or P(i) : R(i) = (R(i) << 3) Or (R(i) >> 2)
@@ -343,30 +444,34 @@ Public Class DDS_Decoder
             If i = Anchors(0) OrElse i = Anchors(1) OrElse i = Anchors(2) Then
                 numBits -= 1
             End If
-            Dim index As Integer = ReadBits(BlockData, BitPos, numBits)
+            Dim index As Integer = ReadBits(Offset, BitPos, numBits)
             Dim w As Integer = Weight3(index)
             Dim iw As Integer = 64 - w
-            Dim destIdx As Integer = i * 4
-            BlockPixels(destIdx) = CByte(((B(s * 2) * iw + B(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 1) = CByte(((G(s * 2) * iw + G(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 2) = CByte(((R(s * 2) * iw + R(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 3) = 255
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                DecodedBytes(destIdx) = CByte(((B(s * 2) * iw + B(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 1) = CByte(((G(s * 2) * iw + G(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 2) = CByte(((R(s * 2) * iw + R(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 3) = 255
+            End If
         Next
     End Sub
 
-    Private Sub DecodeMode1(BlockData() As Byte, ByRef BitPos As Integer, BlockPixels() As Byte)
-        Dim Partition As Integer = ReadBits(BlockData, BitPos, 6)
+    Private Sub DecodeMode1(Offset As Integer, ByRef BitPos As Integer, xPixelBase As Integer, yPixelBase As Integer)
+        Dim Partition As Integer = ReadBits(Offset, BitPos, 6)
         Dim R(3), G(3), B(3), P(1) As Integer
         For i As Integer = 0 To 3
-            R(i) = ReadBits(BlockData, BitPos, 6)
+            R(i) = ReadBits(Offset, BitPos, 6)
         Next
         For i As Integer = 0 To 3
-            G(i) = ReadBits(BlockData, BitPos, 6)
+            G(i) = ReadBits(Offset, BitPos, 6)
         Next
         For i As Integer = 0 To 3
-            B(i) = ReadBits(BlockData, BitPos, 6)
+            B(i) = ReadBits(Offset, BitPos, 6)
         Next
-        P(0) = ReadBits(BlockData, BitPos, 1) : P(1) = ReadBits(BlockData, BitPos, 1)
+        P(0) = ReadBits(Offset, BitPos, 1) : P(1) = ReadBits(Offset, BitPos, 1)
         For i As Integer = 0 To 3
             Dim pBit As Integer = P(i \ 2)
             R(i) = (R(i) << 1) Or pBit : R(i) = (R(i) << 1) Or (R(i) >> 6)
@@ -385,28 +490,32 @@ Public Class DDS_Decoder
             If i = Anchors(0) OrElse i = Anchors(1) Then
                 numBits -= 1
             End If
-            Dim index As Integer = ReadBits(BlockData, BitPos, numBits)
+            Dim index As Integer = ReadBits(Offset, BitPos, numBits)
             Dim w As Integer = Weight3(index)
             Dim iw As Integer = 64 - w
-            Dim destIdx As Integer = i * 4
-            BlockPixels(destIdx) = CByte(((B(s * 2) * iw + B(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 1) = CByte(((G(s * 2) * iw + G(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 2) = CByte(((R(s * 2) * iw + R(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 3) = 255
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                DecodedBytes(destIdx) = CByte(((B(s * 2) * iw + B(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 1) = CByte(((G(s * 2) * iw + G(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 2) = CByte(((R(s * 2) * iw + R(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 3) = 255
+            End If
         Next
     End Sub
 
-    Private Sub DecodeMode2(BlockData() As Byte, ByRef BitPos As Integer, BlockPixels() As Byte)
-        Dim Partition As Integer = ReadBits(BlockData, BitPos, 6)
+    Private Sub DecodeMode2(Offset As Integer, ByRef BitPos As Integer, xPixelBase As Integer, yPixelBase As Integer)
+        Dim Partition As Integer = ReadBits(Offset, BitPos, 6)
         Dim R(5), G(5), B(5) As Integer
         For i As Integer = 0 To 5
-            R(i) = ReadBits(BlockData, BitPos, 5)
+            R(i) = ReadBits(Offset, BitPos, 5)
         Next
         For i As Integer = 0 To 5
-            G(i) = ReadBits(BlockData, BitPos, 5)
+            G(i) = ReadBits(Offset, BitPos, 5)
         Next
         For i As Integer = 0 To 5
-            B(i) = ReadBits(BlockData, BitPos, 5)
+            B(i) = ReadBits(Offset, BitPos, 5)
         Next
         For i As Integer = 0 To 5
             R(i) = (R(i) << 3) Or (R(i) >> 2)
@@ -426,31 +535,35 @@ Public Class DDS_Decoder
             If i = Anchors(0) OrElse i = Anchors(1) OrElse i = Anchors(2) Then
                 numBits -= 1
             End If
-            Dim index As Integer = ReadBits(BlockData, BitPos, numBits)
+            Dim index As Integer = ReadBits(Offset, BitPos, numBits)
             Dim w As Integer = Weight2(index)
             Dim iw As Integer = 64 - w
-            Dim destIdx As Integer = i * 4
-            BlockPixels(destIdx) = CByte(((B(s * 2) * iw + B(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 1) = CByte(((G(s * 2) * iw + G(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 2) = CByte(((R(s * 2) * iw + R(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 3) = 255
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                DecodedBytes(destIdx) = CByte(((B(s * 2) * iw + B(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 1) = CByte(((G(s * 2) * iw + G(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 2) = CByte(((R(s * 2) * iw + R(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 3) = 255
+            End If
         Next
     End Sub
 
-    Private Sub DecodeMode3(BlockData() As Byte, ByRef BitPos As Integer, BlockPixels() As Byte)
-        Dim Partition As Integer = ReadBits(BlockData, BitPos, 6)
+    Private Sub DecodeMode3(Offset As Integer, ByRef BitPos As Integer, xPixelBase As Integer, yPixelBase As Integer)
+        Dim Partition As Integer = ReadBits(Offset, BitPos, 6)
         Dim R(3), G(3), B(3), P(3) As Integer
         For i As Integer = 0 To 3
-            R(i) = ReadBits(BlockData, BitPos, 7)
+            R(i) = ReadBits(Offset, BitPos, 7)
         Next
         For i As Integer = 0 To 3
-            G(i) = ReadBits(BlockData, BitPos, 7)
+            G(i) = ReadBits(Offset, BitPos, 7)
         Next
         For i As Integer = 0 To 3
-            B(i) = ReadBits(BlockData, BitPos, 7)
+            B(i) = ReadBits(Offset, BitPos, 7)
         Next
         For i As Integer = 0 To 3
-            P(i) = ReadBits(BlockData, BitPos, 1)
+            P(i) = ReadBits(Offset, BitPos, 1)
         Next
         For i As Integer = 0 To 3
             R(i) = (R(i) << 1) Or P(i)
@@ -469,24 +582,28 @@ Public Class DDS_Decoder
             If i = Anchors(0) OrElse i = Anchors(1) Then
                 numBits -= 1
             End If
-            Dim index As Integer = ReadBits(BlockData, BitPos, numBits)
+            Dim index As Integer = ReadBits(Offset, BitPos, numBits)
             Dim w As Integer = Weight2(index)
             Dim iw As Integer = 64 - w
-            Dim destIdx As Integer = i * 4
-            BlockPixels(destIdx) = CByte(((B(s * 2) * iw + B(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 1) = CByte(((G(s * 2) * iw + G(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 2) = CByte(((R(s * 2) * iw + R(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 3) = 255
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                DecodedBytes(destIdx) = CByte(((B(s * 2) * iw + B(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 1) = CByte(((G(s * 2) * iw + G(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 2) = CByte(((R(s * 2) * iw + R(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 3) = 255
+            End If
         Next
     End Sub
 
-    Private Sub DecodeMode4(BlockData() As Byte, ByRef BitPos As Integer, BlockPixels() As Byte)
-        Dim Rotation As Integer = ReadBits(BlockData, BitPos, 2)
-        Dim IndexMode As Integer = ReadBits(BlockData, BitPos, 1)
-        Dim r0 As Integer = ReadBits(BlockData, BitPos, 5) : Dim r1 As Integer = ReadBits(BlockData, BitPos, 5)
-        Dim g0 As Integer = ReadBits(BlockData, BitPos, 5) : Dim g1 As Integer = ReadBits(BlockData, BitPos, 5)
-        Dim b0 As Integer = ReadBits(BlockData, BitPos, 5) : Dim b1 As Integer = ReadBits(BlockData, BitPos, 5)
-        Dim a0 As Integer = ReadBits(BlockData, BitPos, 6) : Dim a1 As Integer = ReadBits(BlockData, BitPos, 6)
+    Private Sub DecodeMode4(Offset As Integer, ByRef BitPos As Integer, xPixelBase As Integer, yPixelBase As Integer)
+        Dim Rotation As Integer = ReadBits(Offset, BitPos, 2)
+        Dim IndexMode As Integer = ReadBits(Offset, BitPos, 1)
+        Dim r0 As Integer = ReadBits(Offset, BitPos, 5) : Dim r1 As Integer = ReadBits(Offset, BitPos, 5)
+        Dim g0 As Integer = ReadBits(Offset, BitPos, 5) : Dim g1 As Integer = ReadBits(Offset, BitPos, 5)
+        Dim b0 As Integer = ReadBits(Offset, BitPos, 5) : Dim b1 As Integer = ReadBits(Offset, BitPos, 5)
+        Dim a0 As Integer = ReadBits(Offset, BitPos, 6) : Dim a1 As Integer = ReadBits(Offset, BitPos, 6)
         r0 = (r0 << 3) Or (r0 >> 2) : r1 = (r1 << 3) Or (r1 >> 2)
         g0 = (g0 << 3) Or (g0 >> 2) : g1 = (g1 << 3) Or (g1 >> 2)
         b0 = (b0 << 3) Or (b0 >> 2) : b1 = (b1 << 3) Or (b1 >> 2)
@@ -495,11 +612,11 @@ Public Class DDS_Decoder
         Dim AlphaBits As Integer = If(IndexMode = 0, 3, 2)
         Dim Indices2Bit(15) As Integer
         For i As Integer = 0 To 15
-            Indices2Bit(i) = ReadBits(BlockData, BitPos, If(i = 0, 1, 2))
+            Indices2Bit(i) = ReadBits(Offset, BitPos, If(i = 0, 1, 2))
         Next
         Dim Indices3Bit(15) As Integer
         For i As Integer = 0 To 15
-            Indices3Bit(i) = ReadBits(BlockData, BitPos, If(i = 0, 2, 3))
+            Indices3Bit(i) = ReadBits(Offset, BitPos, If(i = 0, 2, 3))
         Next
         Dim ColorIndices(15) As Integer
         Dim AlphaIndices(15) As Integer
@@ -524,31 +641,35 @@ Public Class DDS_Decoder
                 Case 2 : Dim t As Integer = g : g = a : a = t
                 Case 3 : Dim t As Integer = b : b = a : a = t
             End Select
-            Dim destIdx As Integer = i * 4
-            BlockPixels(destIdx) = CByte(b)
-            BlockPixels(destIdx + 1) = CByte(g)
-            BlockPixels(destIdx + 2) = CByte(r)
-            BlockPixels(destIdx + 3) = CByte(a)
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                DecodedBytes(destIdx) = CByte(b)
+                DecodedBytes(destIdx + 1) = CByte(g)
+                DecodedBytes(destIdx + 2) = CByte(r)
+                DecodedBytes(destIdx + 3) = CByte(a)
+            End If
         Next
     End Sub
 
 
-    Private Sub DecodeMode5(BlockData() As Byte, ByRef BitPos As Integer, BlockPixels() As Byte)
-        Dim Rotation As Integer = ReadBits(BlockData, BitPos, 2)
-        Dim r0 As Integer = ReadBits(BlockData, BitPos, 7) : Dim r1 As Integer = ReadBits(BlockData, BitPos, 7)
-        Dim g0 As Integer = ReadBits(BlockData, BitPos, 7) : Dim g1 As Integer = ReadBits(BlockData, BitPos, 7)
-        Dim b0 As Integer = ReadBits(BlockData, BitPos, 7) : Dim b1 As Integer = ReadBits(BlockData, BitPos, 7)
-        Dim a0 As Integer = ReadBits(BlockData, BitPos, 8) : Dim a1 As Integer = ReadBits(BlockData, BitPos, 8)
+    Private Sub DecodeMode5(Offset As Integer, ByRef BitPos As Integer, xPixelBase As Integer, yPixelBase As Integer)
+        Dim Rotation As Integer = ReadBits(Offset, BitPos, 2)
+        Dim r0 As Integer = ReadBits(Offset, BitPos, 7) : Dim r1 As Integer = ReadBits(Offset, BitPos, 7)
+        Dim g0 As Integer = ReadBits(Offset, BitPos, 7) : Dim g1 As Integer = ReadBits(Offset, BitPos, 7)
+        Dim b0 As Integer = ReadBits(Offset, BitPos, 7) : Dim b1 As Integer = ReadBits(Offset, BitPos, 7)
+        Dim a0 As Integer = ReadBits(Offset, BitPos, 8) : Dim a1 As Integer = ReadBits(Offset, BitPos, 8)
         r0 = (r0 << 1) Or (r0 >> 6) : r1 = (r1 << 1) Or (r1 >> 6)
         g0 = (g0 << 1) Or (g0 >> 6) : g1 = (g1 << 1) Or (g1 >> 6)
         b0 = (b0 << 1) Or (b0 >> 6) : b1 = (b1 << 1) Or (b1 >> 6)
         Dim ColorIndices(15) As Integer
         For i As Integer = 0 To 15
-            ColorIndices(i) = ReadBits(BlockData, BitPos, If(i = 0, 1, 2))
+            ColorIndices(i) = ReadBits(Offset, BitPos, If(i = 0, 1, 2))
         Next
         Dim AlphaIndices(15) As Integer
         For i As Integer = 0 To 15
-            AlphaIndices(i) = ReadBits(BlockData, BitPos, If(i = 0, 1, 2))
+            AlphaIndices(i) = ReadBits(Offset, BitPos, If(i = 0, 1, 2))
         Next
         For i As Integer = 0 To 15
             Dim cw As Integer = Weight2(ColorIndices(i))
@@ -564,53 +685,61 @@ Public Class DDS_Decoder
                 Case 2 : Dim t As Integer = g : g = a : a = t
                 Case 3 : Dim t As Integer = b : b = a : a = t
             End Select
-            Dim destIdx As Integer = i * 4
-            BlockPixels(destIdx) = CByte(b)
-            BlockPixels(destIdx + 1) = CByte(g)
-            BlockPixels(destIdx + 2) = CByte(r)
-            BlockPixels(destIdx + 3) = CByte(a)
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                DecodedBytes(destIdx) = CByte(b)
+                DecodedBytes(destIdx + 1) = CByte(g)
+                DecodedBytes(destIdx + 2) = CByte(r)
+                DecodedBytes(destIdx + 3) = CByte(a)
+            End If
         Next
     End Sub
 
-    Private Sub DecodeMode6(BlockData() As Byte, ByRef BitPos As Integer, BlockPixels() As Byte)
-        Dim r0 As Integer = ReadBits(BlockData, BitPos, 7) : Dim r1 As Integer = ReadBits(BlockData, BitPos, 7)
-        Dim g0 As Integer = ReadBits(BlockData, BitPos, 7) : Dim g1 As Integer = ReadBits(BlockData, BitPos, 7)
-        Dim b0 As Integer = ReadBits(BlockData, BitPos, 7) : Dim b1 As Integer = ReadBits(BlockData, BitPos, 7)
-        Dim a0 As Integer = ReadBits(BlockData, BitPos, 7) : Dim a1 As Integer = ReadBits(BlockData, BitPos, 7)
-        Dim p0 As Integer = ReadBits(BlockData, BitPos, 1) : Dim p1 As Integer = ReadBits(BlockData, BitPos, 1)
+    Private Sub DecodeMode6(Offset As Integer, ByRef BitPos As Integer, xPixelBase As Integer, yPixelBase As Integer)
+        Dim r0 As Integer = ReadBits(Offset, BitPos, 7) : Dim r1 As Integer = ReadBits(Offset, BitPos, 7)
+        Dim g0 As Integer = ReadBits(Offset, BitPos, 7) : Dim g1 As Integer = ReadBits(Offset, BitPos, 7)
+        Dim b0 As Integer = ReadBits(Offset, BitPos, 7) : Dim b1 As Integer = ReadBits(Offset, BitPos, 7)
+        Dim a0 As Integer = ReadBits(Offset, BitPos, 7) : Dim a1 As Integer = ReadBits(Offset, BitPos, 7)
+        Dim p0 As Integer = ReadBits(Offset, BitPos, 1) : Dim p1 As Integer = ReadBits(Offset, BitPos, 1)
         r0 = (r0 << 1) Or p0 : r1 = (r1 << 1) Or p1
         g0 = (g0 << 1) Or p0 : g1 = (g1 << 1) Or p1
         b0 = (b0 << 1) Or p0 : b1 = (b1 << 1) Or p1
         a0 = (a0 << 1) Or p0 : a1 = (a1 << 1) Or p1
         For i As Integer = 0 To 15
-            Dim Index As Integer = ReadBits(BlockData, BitPos, If(i = 0, 3, 4))
+            Dim Index As Integer = ReadBits(Offset, BitPos, If(i = 0, 3, 4))
             Dim w As Integer = Weight4(Index)
             Dim iw As Integer = 64 - w
-            Dim destIdx As Integer = i * 4
-            BlockPixels(destIdx) = CByte(((b0 * iw + b1 * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 1) = CByte(((g0 * iw + g1 * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 2) = CByte(((r0 * iw + r1 * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 3) = CByte(((a0 * iw + a1 * w + 32) >> 6) And 255)
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                DecodedBytes(destIdx) = CByte(((b0 * iw + b1 * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 1) = CByte(((g0 * iw + g1 * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 2) = CByte(((r0 * iw + r1 * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 3) = CByte(((a0 * iw + a1 * w + 32) >> 6) And 255)
+            End If
         Next
     End Sub
 
-    Private Sub DecodeMode7(BlockData() As Byte, ByRef BitPos As Integer, BlockPixels() As Byte)
-        Dim Partition As Integer = ReadBits(BlockData, BitPos, 6)
+    Private Sub DecodeMode7(Offset As Integer, ByRef BitPos As Integer, xPixelBase As Integer, yPixelBase As Integer)
+        Dim Partition As Integer = ReadBits(Offset, BitPos, 6)
         Dim R(3), G(3), B(3), A(3), P(3) As Integer
         For i As Integer = 0 To 3
-            R(i) = ReadBits(BlockData, BitPos, 5)
+            R(i) = ReadBits(Offset, BitPos, 5)
         Next
         For i As Integer = 0 To 3
-            G(i) = ReadBits(BlockData, BitPos, 5)
+            G(i) = ReadBits(Offset, BitPos, 5)
         Next
         For i As Integer = 0 To 3
-            B(i) = ReadBits(BlockData, BitPos, 5)
+            B(i) = ReadBits(Offset, BitPos, 5)
         Next
         For i As Integer = 0 To 3
-            A(i) = ReadBits(BlockData, BitPos, 5)
+            A(i) = ReadBits(Offset, BitPos, 5)
         Next
         For i As Integer = 0 To 3
-            P(i) = ReadBits(BlockData, BitPos, 1)
+            P(i) = ReadBits(Offset, BitPos, 1)
         Next
         For i As Integer = 0 To 3
             R(i) = (R(i) << 1) Or P(i) : R(i) = (R(i) << 2) Or (R(i) >> 4)
@@ -630,14 +759,18 @@ Public Class DDS_Decoder
             If i = Anchors(0) OrElse i = Anchors(1) Then
                 numBits -= 1
             End If
-            Dim index As Integer = ReadBits(BlockData, BitPos, numBits)
+            Dim index As Integer = ReadBits(Offset, BitPos, numBits)
             Dim w As Integer = Weight2(index)
             Dim iw As Integer = 64 - w
-            Dim destIdx As Integer = i * 4
-            BlockPixels(destIdx) = CByte(((B(s * 2) * iw + B(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 1) = CByte(((G(s * 2) * iw + G(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 2) = CByte(((R(s * 2) * iw + R(s * 2 + 1) * w + 32) >> 6) And 255)
-            BlockPixels(destIdx + 3) = CByte(((A(s * 2) * iw + A(s * 2 + 1) * w + 32) >> 6) And 255)
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                DecodedBytes(destIdx) = CByte(((B(s * 2) * iw + B(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 1) = CByte(((G(s * 2) * iw + G(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 2) = CByte(((R(s * 2) * iw + R(s * 2 + 1) * w + 32) >> 6) And 255)
+                DecodedBytes(destIdx + 3) = CByte(((A(s * 2) * iw + A(s * 2 + 1) * w + 32) >> 6) And 255)
+            End If
         Next
     End Sub
 
@@ -645,115 +778,45 @@ Public Class DDS_Decoder
     ''' Replaces the specific block with a solid color, useful for debugging.
     ''' </summary>
     ''' <param name="ColorIndex">0: Red, 1: Green, 2: Blue, 3: Yellow, 4: Magenta, 5: Cyan, 6: White, 7: Black</param>
-    Private Sub DecodeModeDiagnostic(BlockData() As Byte, ByRef BitPos As Integer, BlockPixels() As Byte, Optional ColorIndex As Integer = 4)
+    Private Sub DecodeModeDiagnostic(Offset As Integer, ByRef BitPos As Integer, xPixelBase As Integer, yPixelBase As Integer, Optional ColorIndex As Integer = 4)
         Dim B() As Byte = {0, 0, 255, 0, 255, 255, 255, 0}
         Dim G() As Byte = {0, 255, 0, 255, 0, 255, 255, 0}
         Dim R() As Byte = {255, 0, 0, 255, 255, 0, 255, 0}
         Dim safeIdx As Integer = Math.Abs(ColorIndex) Mod 8
         For i As Integer = 0 To 15
-            Dim destIdx As Integer = i * 4
-            BlockPixels(destIdx) = B(safeIdx)
-            BlockPixels(destIdx + 1) = G(safeIdx)
-            BlockPixels(destIdx + 2) = R(safeIdx)
-            BlockPixels(destIdx + 3) = 255
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                DecodedBytes(destIdx) = B(safeIdx)
+                DecodedBytes(destIdx + 1) = G(safeIdx)
+                DecodedBytes(destIdx + 2) = R(safeIdx)
+                DecodedBytes(destIdx + 3) = 255
+            End If
         Next
         BitPos = 128
     End Sub
 
-    Private Function ReadBits(Data() As Byte, ByRef BitPosition As Integer, BitCount As Integer) As Integer
+    Private Function ReadBits(Offset As Integer, ByRef BitPosition As Integer, BitCount As Integer) As Integer
         Dim Value As Integer = 0
         Dim BitsRead As Integer = 0
-
         While BitsRead < BitCount
-            Dim ByteIdx As Integer = BitPosition \ 8
-            Dim BitInByte As Integer = BitPosition Mod 8
+            Dim ByteIdx As Integer = BitPosition >> 3
+            Dim BitInByte As Integer = BitPosition And 7
             Dim BitsToReadFromByte As Integer = Math.Min(BitCount - BitsRead, 8 - BitInByte)
-
             Dim Mask As Integer = (1 << BitsToReadFromByte) - 1
-            Dim Bits As Integer = (Data(ByteIdx) >> BitInByte) And Mask
-
+            Dim Bits As Integer = (SourceBytes(Offset + ByteIdx) >> BitInByte) And Mask
             Value = Value Or (Bits << BitsRead)
-
             BitPosition += BitsToReadFromByte
             BitsRead += BitsToReadFromByte
         End While
-
         Return Value
     End Function
 
-    Private Sub DecodeColorBlock(Offset As Integer, BlockPixels() As Byte, ActiveMode As Integer)
-        Dim c0_raw As UShort = BitConverter.ToUInt16(SourceBytes, Offset)
-        Dim c1_raw As UShort = BitConverter.ToUInt16(SourceBytes, Offset + 2)
-        Dim ColorTable As UInteger = BitConverter.ToUInt32(SourceBytes, Offset + 4)
-        Dim cPal(3, 3) As Byte
-        Dim p0() As Byte = Unpack565(c0_raw)
-        Dim p1() As Byte = Unpack565(c1_raw)
-        cPal(0, 0) = p0(0) : cPal(0, 1) = p0(1) : cPal(0, 2) = p0(2) : cPal(0, 3) = 255
-        cPal(1, 0) = p1(0) : cPal(1, 1) = p1(1) : cPal(1, 2) = p1(2) : cPal(1, 3) = 255
-        If ActiveMode = 2 OrElse c0_raw > c1_raw Then
-            cPal(2, 0) = CByte((CInt(cPal(0, 0)) * 2 + cPal(1, 0)) \ 3)
-            cPal(2, 1) = CByte((CInt(cPal(0, 1)) * 2 + cPal(1, 1)) \ 3)
-            cPal(2, 2) = CByte((CInt(cPal(0, 2)) * 2 + cPal(1, 2)) \ 3)
-            cPal(2, 3) = 255
-
-            cPal(3, 0) = CByte((CInt(cPal(0, 0)) + cPal(1, 0) * 2) \ 3)
-            cPal(3, 1) = CByte((CInt(cPal(0, 1)) + cPal(1, 1) * 2) \ 3)
-            cPal(3, 2) = CByte((CInt(cPal(0, 2)) + cPal(1, 2) * 2) \ 3)
-            cPal(3, 3) = 255
-        Else
-            cPal(2, 0) = CByte((CInt(cPal(0, 0)) + cPal(1, 0)) \ 2)
-            cPal(2, 1) = CByte((CInt(cPal(0, 1)) + cPal(1, 1)) \ 2)
-            cPal(2, 2) = CByte((CInt(cPal(0, 2)) + cPal(1, 2)) \ 2)
-            cPal(2, 3) = 255
-
-            cPal(3, 0) = 0 : cPal(3, 1) = 0 : cPal(3, 2) = 0
-            cPal(3, 3) = CByte(If(ActiveMode = 1, 0, 255))
-        End If
-        For i As Integer = 0 To 15
-            Dim cIdx As Integer = CInt((ColorTable >> (i * 2)) And 3UI)
-            Dim destIdx As Integer = i * 4
-            BlockPixels(destIdx) = cPal(cIdx, 0)
-            BlockPixels(destIdx + 1) = cPal(cIdx, 1)
-            BlockPixels(destIdx + 2) = cPal(cIdx, 2)
-            BlockPixels(destIdx + 3) = cPal(cIdx, 3)
-        Next
-    End Sub
-
-    Private Sub DecodeSingleChannelBlock(Offset As Integer, BlockPixels() As Byte, TargetChannel As Integer)
-        Dim aPal(7) As Byte
-        Dim a0 As Byte = SourceBytes(Offset)
-        Dim a1 As Byte = SourceBytes(Offset + 1)
-        aPal(0) = a0
-        aPal(1) = a1
-        If a0 > a1 Then
-            For i As Integer = 1 To 6
-                aPal(i + 1) = CByte(((7 - i) * CInt(a0) + i * CInt(a1)) \ 7)
-            Next
-        Else
-            For i As Integer = 1 To 4
-                aPal(i + 1) = CByte(((5 - i) * CInt(a0) + i * CInt(a1)) \ 5)
-            Next
-            aPal(6) = 0
-            aPal(7) = 255
-        End If
-        Dim AlphaTable As ULong = 0
-        For i As Integer = 0 To 5
-            AlphaTable = AlphaTable Or (CType(SourceBytes(Offset + 2 + i), ULong) << (i * 8))
-        Next
-        For i As Integer = 0 To 15
-            Dim destIdx As Integer = (i * 4) + TargetChannel
-            Dim aIdx As Integer = CInt((AlphaTable >> (i * 3)) And 7UL)
-            BlockPixels(destIdx) = aPal(aIdx)
-        Next
-    End Sub
+#End Region
 
     Public Sub SaveImage(Path As String, Format As ImageFormat)
-        Try
-            BeginDecode()
-        Catch ex As Exception
-            MsgBox(ex.Message, MsgBoxStyle.Critical)
-            Exit Sub
-        End Try
+        BeginDecode()
         Using TempImage As New Bitmap(Width, Height, PixelFormat.Format32bppArgb)
             Dim Rect As New Rectangle(0, 0, Width, Height)
             Dim TempData As BitmapData = TempImage.LockBits(Rect, ImageLockMode.WriteOnly, TempImage.PixelFormat)
@@ -762,6 +825,16 @@ Public Class DDS_Decoder
             TempImage.Save(Path, Format)
         End Using
     End Sub
+
+    Public Function GetPreviewImage() As Image
+        BeginDecode()
+        Dim TempImage As New Bitmap(Width, Height, PixelFormat.Format32bppArgb)
+        Dim Rect As New Rectangle(0, 0, Width, Height)
+        Dim TempData As BitmapData = TempImage.LockBits(Rect, ImageLockMode.WriteOnly, TempImage.PixelFormat)
+        Marshal.Copy(DecodedBytes, 0, TempData.Scan0, DecodedBytes.Length)
+        TempImage.UnlockBits(TempData)
+        Return TempImage
+    End Function
 
     Private Sub SetMask(RIdx As Integer, GIdx As Integer, BIdx As Integer, Optional AIdx As Integer = -1)
         RedBitMask = If(RIdx >= 0, &HFF << (RIdx * 8), 0)
