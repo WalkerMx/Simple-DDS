@@ -18,6 +18,7 @@ A lightweight, fully managed DDS encoder and decoder. Simple-DDS provides a zero
 
 Comparison testing was done on a Xeon E3-1260L, strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses BC7 Mode 6 only, for fast, high-quality block compression.
 
+### Encoding
 | | TexConv | Simple-DDS | Delta |
 | :--- | :--- | :--- | :--- |
 | BC1 No Mips | 663.34ms | 821.58ms | 1.2x Slower |
@@ -26,7 +27,10 @@ Comparison testing was done on a Xeon E3-1260L, strictly on the CPU.  Results ar
 | BC3 Full Mips | 2,063.11ms | 1,763.86ms | 1.2x Faster |
 | BC7 (Mode 6) No Mips | 74,101ms | 784.14ms | 94.5x Faster |
 | BC7 (Mode 6) Full Mips | 102,513ms | 1,373.6ms | 74.6x Faster |
-| | | | |
+
+### Decoding
+| | TexConv | Simple-DDS | Delta |
+| :--- | :--- | :--- | :--- |
 | BC1 to PNG | 2,105.18ms | 305.28ms | 6.9x Faster |
 | BC3 to PNG | 2,033.15ms | 380.66ms | 5.3x Faster |
 | BC7 to PNG | 2,993.03ms | 620.08ms | 4.8x Faster |
