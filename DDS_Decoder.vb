@@ -290,7 +290,6 @@ Public Class DDS_Decoder
                 Dim dSq As Integer = (dX * dX) + (dY * dY)
                 Dim BVal As Integer = 255 - (dSq >> 7)
                 If BVal < 128 Then BVal = 128
-                If BVal > 255 Then BVal = 255
                 DecodedBytes(destIdx + 0) = CByte(BVal)
                 DecodedBytes(destIdx + 3) = 255
             End If
@@ -306,6 +305,26 @@ Public Class DDS_Decoder
                 Dim RVal As Byte = DecodedBytes(destIdx + 2)
                 DecodedBytes(destIdx) = RVal
                 DecodedBytes(destIdx + 1) = RVal
+                DecodedBytes(destIdx + 3) = 255
+            End If
+        Next
+    End Sub
+
+    Private Sub DecodeBlockBC3nm(xPixelBase As Integer, yPixelBase As Integer)
+        For i As Integer = 0 To 15
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                Dim RVal As Integer = DecodedBytes(destIdx + 3)
+                Dim GVal As Integer = DecodedBytes(destIdx + 1)
+                Dim dX As Integer = RVal - 128
+                Dim dY As Integer = GVal - 128
+                Dim dSq As Integer = (dX * dX) + (dY * dY)
+                Dim BVal As Integer = 255 - (dSq >> 7)
+                If BVal < 128 Then BVal = 128
+                DecodedBytes(destIdx + 0) = CByte(BVal)
+                DecodedBytes(destIdx + 2) = CByte(RVal)
                 DecodedBytes(destIdx + 3) = 255
             End If
         Next

@@ -51,6 +51,7 @@ Public Class Form1
         Dim FileExt As String = OutputFormatComboBox.SelectedItem.ToString
         Using SFD As New SaveFileDialog With {.Filter = $"{FileExt} Files|*.{FileExt.ToLower}|All Files|*.*", .FileName = Path.GetFileNameWithoutExtension(FilePath)}
             If SFD.ShowDialog = DialogResult.OK Then
+                LoadImageButton.Enabled = False
                 ExportImageButton.Enabled = False
                 Select Case FileExt
                     Case "PNG"
@@ -61,6 +62,7 @@ Public Class Form1
                         PreviewImage.Save(SFD.FileName, ImageFormat.Bmp)
                 End Select
                 ExportImageButton.Enabled = True
+                LoadImageButton.Enabled = True
             End If
         End Using
     End Sub
@@ -72,11 +74,38 @@ Public Class Form1
         Dim doMipMaps As Boolean = MipMapCheckBox.Checked
         Using SFD As New SaveFileDialog With {.Filter = "DDS Files|*.dds|All Files|*.*", .FileName = Path.GetFileNameWithoutExtension(FilePath)}
             If SFD.ShowDialog = DialogResult.OK Then
+                LoadImageButton.Enabled = False
                 ExportDDSButton.Enabled = False
                 Using DDSEncoder As New DDS_Encoder(FilePath, targetFormat, doMipMaps, isLegacy)
                     Await Task.Run(Sub() DDSEncoder.Save(SFD.FileName))
                 End Using
                 ExportDDSButton.Enabled = True
+                LoadImageButton.Enabled = True
+            End If
+        End Using
+    End Sub
+
+    Private Async Sub BenchButton_Click(sender As Object, e As EventArgs) Handles BenchButton.Click
+        Using OFD As New OpenFileDialog With {.Filter = "Image Files|*.png;*.jpg;*.bmp"}
+            If OFD.ShowDialog = DialogResult.OK Then
+                Dim targetFormat As DXGI_Format = GetFormatFromString(OverrideComboBox.SelectedItem.ToString())
+                Dim isLegacy As Boolean = Not ExtendedHeaderCheckBox.Checked
+                Dim doMipMaps As Boolean = MipMapCheckBox.Checked
+                Dim BenchTime As Integer = 0
+                Dim BenchTimer As Stopwatch
+                LoadImageButton.Enabled = False
+                ExportDDSButton.Enabled = False
+                BenchTimer = Stopwatch.StartNew
+                For i = 0 To 49
+                    Using DDSEncoder As New DDS_Encoder(OFD.FileName, targetFormat, doMipMaps, isLegacy)
+                        DDSEncoder.BeginEncode()
+                    End Using
+                Next
+                BenchTimer.Stop()
+                BenchTime = BenchTimer.ElapsedMilliseconds
+                MsgBox($"Average: {BenchTime / 50}ms")
+                ExportDDSButton.Enabled = True
+                LoadImageButton.Enabled = True
             End If
         End Using
     End Sub

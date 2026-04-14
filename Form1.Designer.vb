@@ -39,6 +39,7 @@ Partial Class Form1
         Me.InfoTextBox = New System.Windows.Forms.TextBox()
         Me.LoadImageButton = New System.Windows.Forms.Button()
         Me.RightPanel = New System.Windows.Forms.Panel()
+        Me.BenchButton = New System.Windows.Forms.Button()
         Me.PreviewPictureBox = New System.Windows.Forms.PictureBox()
         Me.LeftPanel = New System.Windows.Forms.Panel()
         Me.DDSExportGroup.SuspendLayout()
@@ -136,7 +137,6 @@ Partial Class Form1
         Me.DDSExportGroup.Controls.Add(Me.NoAlphaRB)
         Me.DDSExportGroup.Controls.Add(Me.SmoothAlphaRB)
         Me.DDSExportGroup.Controls.Add(Me.SharpAlphaRB)
-        Me.DDSExportGroup.Enabled = False
         Me.DDSExportGroup.Location = New System.Drawing.Point(3, 3)
         Me.DDSExportGroup.Name = "DDSExportGroup"
         Me.DDSExportGroup.Size = New System.Drawing.Size(194, 175)
@@ -226,6 +226,7 @@ Partial Class Form1
         '
         'RightPanel
         '
+        Me.RightPanel.Controls.Add(Me.BenchButton)
         Me.RightPanel.Controls.Add(Me.ImageExportGroup)
         Me.RightPanel.Controls.Add(Me.DDSExportGroup)
         Me.RightPanel.Dock = System.Windows.Forms.DockStyle.Right
@@ -233,6 +234,15 @@ Partial Class Form1
         Me.RightPanel.Name = "RightPanel"
         Me.RightPanel.Size = New System.Drawing.Size(200, 400)
         Me.RightPanel.TabIndex = 0
+        '
+        'BenchButton
+        '
+        Me.BenchButton.Location = New System.Drawing.Point(3, 275)
+        Me.BenchButton.Name = "BenchButton"
+        Me.BenchButton.Size = New System.Drawing.Size(75, 23)
+        Me.BenchButton.TabIndex = 12
+        Me.BenchButton.Text = "Benchmark"
+        Me.BenchButton.UseVisualStyleBackColor = True
         '
         'PreviewPictureBox
         '
@@ -288,7 +298,6 @@ Partial Class Form1
     Friend WithEvents DDSExportGroup As GroupBox
     Friend WithEvents ImageExportGroup As GroupBox
     Friend WithEvents ExportImageButton As Button
-    Friend WithEvents Label1 As Label
     Friend WithEvents OutputFormatComboBox As ComboBox
     Friend WithEvents NormalCheckBox As CheckBox
     Friend WithEvents OverrideComboBox As ComboBox
@@ -297,4 +306,6 @@ Partial Class Form1
     Friend WithEvents RightPanel As Panel
     Friend WithEvents PreviewPictureBox As PictureBox
     Friend WithEvents LeftPanel As Panel
+    Friend WithEvents Label1 As Label
+    Friend WithEvents BenchButton As Button
 End Class
