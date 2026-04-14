@@ -36,27 +36,16 @@ Partial Class Form1
         Me.Label1 = New System.Windows.Forms.Label()
         Me.OutputFormatComboBox = New System.Windows.Forms.ComboBox()
         Me.ExportImageButton = New System.Windows.Forms.Button()
-        Me.SplitContainer1 = New System.Windows.Forms.SplitContainer()
-        Me.SplitContainer3 = New System.Windows.Forms.SplitContainer()
         Me.InfoTextBox = New System.Windows.Forms.TextBox()
         Me.LoadImageButton = New System.Windows.Forms.Button()
-        Me.SplitContainer2 = New System.Windows.Forms.SplitContainer()
+        Me.RightPanel = New System.Windows.Forms.Panel()
         Me.PreviewPictureBox = New System.Windows.Forms.PictureBox()
+        Me.LeftPanel = New System.Windows.Forms.Panel()
         Me.DDSExportGroup.SuspendLayout()
         Me.ImageExportGroup.SuspendLayout()
-        CType(Me.SplitContainer1, System.ComponentModel.ISupportInitialize).BeginInit()
-        Me.SplitContainer1.Panel1.SuspendLayout()
-        Me.SplitContainer1.Panel2.SuspendLayout()
-        Me.SplitContainer1.SuspendLayout()
-        CType(Me.SplitContainer3, System.ComponentModel.ISupportInitialize).BeginInit()
-        Me.SplitContainer3.Panel1.SuspendLayout()
-        Me.SplitContainer3.Panel2.SuspendLayout()
-        Me.SplitContainer3.SuspendLayout()
-        CType(Me.SplitContainer2, System.ComponentModel.ISupportInitialize).BeginInit()
-        Me.SplitContainer2.Panel1.SuspendLayout()
-        Me.SplitContainer2.Panel2.SuspendLayout()
-        Me.SplitContainer2.SuspendLayout()
+        Me.RightPanel.SuspendLayout()
         CType(Me.PreviewPictureBox, System.ComponentModel.ISupportInitialize).BeginInit()
+        Me.LeftPanel.SuspendLayout()
         Me.SuspendLayout()
         '
         'ExportDDSButton
@@ -215,43 +204,6 @@ Partial Class Form1
         Me.ExportImageButton.Text = "Convert"
         Me.ExportImageButton.UseVisualStyleBackColor = True
         '
-        'SplitContainer1
-        '
-        Me.SplitContainer1.Dock = System.Windows.Forms.DockStyle.Fill
-        Me.SplitContainer1.FixedPanel = System.Windows.Forms.FixedPanel.Panel1
-        Me.SplitContainer1.Location = New System.Drawing.Point(0, 0)
-        Me.SplitContainer1.Name = "SplitContainer1"
-        '
-        'SplitContainer1.Panel1
-        '
-        Me.SplitContainer1.Panel1.Controls.Add(Me.SplitContainer3)
-        '
-        'SplitContainer1.Panel2
-        '
-        Me.SplitContainer1.Panel2.Controls.Add(Me.SplitContainer2)
-        Me.SplitContainer1.Size = New System.Drawing.Size(797, 400)
-        Me.SplitContainer1.SplitterDistance = 188
-        Me.SplitContainer1.TabIndex = 12
-        '
-        'SplitContainer3
-        '
-        Me.SplitContainer3.Dock = System.Windows.Forms.DockStyle.Fill
-        Me.SplitContainer3.FixedPanel = System.Windows.Forms.FixedPanel.Panel2
-        Me.SplitContainer3.Location = New System.Drawing.Point(0, 0)
-        Me.SplitContainer3.Name = "SplitContainer3"
-        Me.SplitContainer3.Orientation = System.Windows.Forms.Orientation.Horizontal
-        '
-        'SplitContainer3.Panel1
-        '
-        Me.SplitContainer3.Panel1.Controls.Add(Me.InfoTextBox)
-        '
-        'SplitContainer3.Panel2
-        '
-        Me.SplitContainer3.Panel2.Controls.Add(Me.LoadImageButton)
-        Me.SplitContainer3.Size = New System.Drawing.Size(188, 400)
-        Me.SplitContainer3.SplitterDistance = 355
-        Me.SplitContainer3.TabIndex = 0
-        '
         'InfoTextBox
         '
         Me.InfoTextBox.Dock = System.Windows.Forms.DockStyle.Fill
@@ -259,75 +211,69 @@ Partial Class Form1
         Me.InfoTextBox.Multiline = True
         Me.InfoTextBox.Name = "InfoTextBox"
         Me.InfoTextBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical
-        Me.InfoTextBox.Size = New System.Drawing.Size(188, 355)
+        Me.InfoTextBox.Size = New System.Drawing.Size(200, 366)
         Me.InfoTextBox.TabIndex = 0
         '
         'LoadImageButton
         '
-        Me.LoadImageButton.Location = New System.Drawing.Point(3, 3)
+        Me.LoadImageButton.Dock = System.Windows.Forms.DockStyle.Bottom
+        Me.LoadImageButton.Location = New System.Drawing.Point(0, 366)
         Me.LoadImageButton.Name = "LoadImageButton"
-        Me.LoadImageButton.Size = New System.Drawing.Size(182, 34)
+        Me.LoadImageButton.Size = New System.Drawing.Size(200, 34)
         Me.LoadImageButton.TabIndex = 0
         Me.LoadImageButton.Text = "Load Image"
         Me.LoadImageButton.UseVisualStyleBackColor = True
         '
-        'SplitContainer2
+        'RightPanel
         '
-        Me.SplitContainer2.Dock = System.Windows.Forms.DockStyle.Fill
-        Me.SplitContainer2.FixedPanel = System.Windows.Forms.FixedPanel.Panel2
-        Me.SplitContainer2.Location = New System.Drawing.Point(0, 0)
-        Me.SplitContainer2.Name = "SplitContainer2"
-        '
-        'SplitContainer2.Panel1
-        '
-        Me.SplitContainer2.Panel1.Controls.Add(Me.PreviewPictureBox)
-        '
-        'SplitContainer2.Panel2
-        '
-        Me.SplitContainer2.Panel2.Controls.Add(Me.DDSExportGroup)
-        Me.SplitContainer2.Panel2.Controls.Add(Me.ImageExportGroup)
-        Me.SplitContainer2.Size = New System.Drawing.Size(605, 400)
-        Me.SplitContainer2.SplitterDistance = 400
-        Me.SplitContainer2.TabIndex = 0
+        Me.RightPanel.Controls.Add(Me.ImageExportGroup)
+        Me.RightPanel.Controls.Add(Me.DDSExportGroup)
+        Me.RightPanel.Dock = System.Windows.Forms.DockStyle.Right
+        Me.RightPanel.Location = New System.Drawing.Point(600, 0)
+        Me.RightPanel.Name = "RightPanel"
+        Me.RightPanel.Size = New System.Drawing.Size(200, 400)
+        Me.RightPanel.TabIndex = 0
         '
         'PreviewPictureBox
         '
         Me.PreviewPictureBox.Dock = System.Windows.Forms.DockStyle.Fill
-        Me.PreviewPictureBox.Location = New System.Drawing.Point(0, 0)
+        Me.PreviewPictureBox.Location = New System.Drawing.Point(200, 0)
         Me.PreviewPictureBox.Name = "PreviewPictureBox"
         Me.PreviewPictureBox.Size = New System.Drawing.Size(400, 400)
         Me.PreviewPictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom
-        Me.PreviewPictureBox.TabIndex = 0
+        Me.PreviewPictureBox.TabIndex = 1
         Me.PreviewPictureBox.TabStop = False
+        '
+        'LeftPanel
+        '
+        Me.LeftPanel.Controls.Add(Me.InfoTextBox)
+        Me.LeftPanel.Controls.Add(Me.LoadImageButton)
+        Me.LeftPanel.Dock = System.Windows.Forms.DockStyle.Left
+        Me.LeftPanel.Location = New System.Drawing.Point(0, 0)
+        Me.LeftPanel.Name = "LeftPanel"
+        Me.LeftPanel.Size = New System.Drawing.Size(200, 400)
+        Me.LeftPanel.TabIndex = 13
         '
         'Form1
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
-        Me.ClientSize = New System.Drawing.Size(797, 400)
-        Me.Controls.Add(Me.SplitContainer1)
+        Me.ClientSize = New System.Drawing.Size(800, 400)
+        Me.Controls.Add(Me.PreviewPictureBox)
+        Me.Controls.Add(Me.LeftPanel)
+        Me.Controls.Add(Me.RightPanel)
         Me.Margin = New System.Windows.Forms.Padding(2)
-        Me.MinimumSize = New System.Drawing.Size(813, 439)
+        Me.MinimumSize = New System.Drawing.Size(816, 439)
         Me.Name = "Form1"
         Me.Text = "Simple DDS"
         Me.DDSExportGroup.ResumeLayout(False)
         Me.DDSExportGroup.PerformLayout()
         Me.ImageExportGroup.ResumeLayout(False)
         Me.ImageExportGroup.PerformLayout()
-        Me.SplitContainer1.Panel1.ResumeLayout(False)
-        Me.SplitContainer1.Panel2.ResumeLayout(False)
-        CType(Me.SplitContainer1, System.ComponentModel.ISupportInitialize).EndInit()
-        Me.SplitContainer1.ResumeLayout(False)
-        Me.SplitContainer3.Panel1.ResumeLayout(False)
-        Me.SplitContainer3.Panel1.PerformLayout()
-        Me.SplitContainer3.Panel2.ResumeLayout(False)
-        CType(Me.SplitContainer3, System.ComponentModel.ISupportInitialize).EndInit()
-        Me.SplitContainer3.ResumeLayout(False)
-        Me.SplitContainer2.Panel1.ResumeLayout(False)
-        Me.SplitContainer2.Panel2.ResumeLayout(False)
-        CType(Me.SplitContainer2, System.ComponentModel.ISupportInitialize).EndInit()
-        Me.SplitContainer2.ResumeLayout(False)
+        Me.RightPanel.ResumeLayout(False)
         CType(Me.PreviewPictureBox, System.ComponentModel.ISupportInitialize).EndInit()
+        Me.LeftPanel.ResumeLayout(False)
+        Me.LeftPanel.PerformLayout()
         Me.ResumeLayout(False)
 
     End Sub
@@ -346,10 +292,9 @@ Partial Class Form1
     Friend WithEvents OutputFormatComboBox As ComboBox
     Friend WithEvents NormalCheckBox As CheckBox
     Friend WithEvents OverrideComboBox As ComboBox
-    Friend WithEvents SplitContainer1 As SplitContainer
-    Friend WithEvents SplitContainer2 As SplitContainer
-    Friend WithEvents SplitContainer3 As SplitContainer
     Friend WithEvents InfoTextBox As TextBox
     Friend WithEvents LoadImageButton As Button
+    Friend WithEvents RightPanel As Panel
     Friend WithEvents PreviewPictureBox As PictureBox
+    Friend WithEvents LeftPanel As Panel
 End Class

@@ -4,6 +4,10 @@ Imports System.Drawing.Imaging
 
 Public Class Form1
 
+    Dim Bench As Boolean = True
+    Dim BenchTime As Integer
+    Dim BenchTimer As Stopwatch
+
     Dim FilePath As String
     Dim PreviewImage As Image
 
@@ -18,21 +22,24 @@ Public Class Form1
                 InfoTextBox.Clear()
                 If PreviewImage IsNot Nothing Then PreviewImage.Dispose()
                 FilePath = OFD.FileName
-                Dim ResultText As String = ""
                 If Extension = ".dds" Then
-                    Try
-                        Using DDSDecoder As New DDS_Decoder(OFD.FileName)
+                    Using DDSDecoder As New DDS_Decoder(OFD.FileName)
+                        If Bench Then
+                            BenchTime = 0
+                            BenchTimer = Stopwatch.StartNew
+                            For i = 0 To 49
+                                DDSDecoder.BeginDecode()
+                            Next
+                            BenchTimer.Stop()
+                            BenchTime = BenchTimer.ElapsedMilliseconds
+                            MsgBox($"Average: {BenchTime / 50}ms")
+                        Else
                             InfoTextBox.Text = GetDDSReport(DDSDecoder)
-                            PreviewImage = Await Task.Run(Function() DDSDecoder.ToBitmap())
-                        End Using
-                        DDSExportGroup.Enabled = False
-                        ImageExportGroup.Enabled = True
-                    Catch ex As Exception
-                        MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation)
-                        DDSExportGroup.Enabled = False
-                        ImageExportGroup.Enabled = False
-                        PreviewImage = New Bitmap(1, 1)
-                    End Try
+                            PreviewImage = Await Task.Run(Function() DDSDecoder.GetPreviewImage())
+                        End If
+                    End Using
+                    DDSExportGroup.Enabled = False
+                    ImageExportGroup.Enabled = True
                 Else
                     Using TempImage As Image = Image.FromFile(OFD.FileName)
                         InfoTextBox.Text = GetImageReport(TempImage)
@@ -49,7 +56,7 @@ Public Class Form1
 
     Private Sub ExportImageButton_Click(sender As Object, e As EventArgs) Handles ExportImageButton.Click
         Dim FileExt As String = OutputFormatComboBox.SelectedItem.ToString
-        Using SFD As New SaveFileDialog With {.Filter = $"{FileExt} Files|*.{FileExt.ToLower}|All Files|*.*", .FileName = Path.GetFileNameWithoutExtension(FilePath)}
+        Using SFD As New SaveFileDialog With {.Filter = $"{FileExt} Files|*.{FileExt.ToLower}|All Files|*.*"}
             If SFD.ShowDialog = DialogResult.OK Then
                 ExportImageButton.Enabled = False
                 Select Case FileExt
@@ -70,11 +77,22 @@ Public Class Form1
         Dim targetFormat As DXGI_Format = GetFormatFromString(OverrideComboBox.SelectedItem.ToString())
         Dim isLegacy As Boolean = Not ExtendedHeaderCheckBox.Checked
         Dim doMipMaps As Boolean = MipMapCheckBox.Checked
-        Using SFD As New SaveFileDialog With {.Filter = "DDS Files|*.dds|All Files|*.*", .FileName = Path.GetFileNameWithoutExtension(FilePath)}
+        Using SFD As New SaveFileDialog With {.Filter = "DDS Files|*.dds|All Files|*.*"}
             If SFD.ShowDialog = DialogResult.OK Then
                 ExportDDSButton.Enabled = False
                 Using DDSEncoder As New DDS_Encoder(FilePath, targetFormat, doMipMaps, isLegacy)
-                    Await Task.Run(Sub() DDSEncoder.Save(SFD.FileName))
+                    If Bench Then
+                        Dim BenchTime As Long = 0
+                        Dim BenchTimer = Stopwatch.StartNew()
+                        For i = 0 To 49
+                            DDSEncoder.BeginEncode()
+                        Next
+                        BenchTimer.Stop()
+                        BenchTime = BenchTimer.ElapsedMilliseconds
+                        MsgBox($"Average: {BenchTime / 50}ms")
+                    Else
+                        Await Task.Run(Sub() DDSEncoder.SaveImage(SFD.FileName))
+                    End If
                 End Using
                 ExportDDSButton.Enabled = True
             End If
