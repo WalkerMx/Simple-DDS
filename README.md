@@ -51,13 +51,13 @@ Kodak Lossless TrueColor Image Suite SSIM Benchmark (24 Images)
 ```vbnet
 'SourcePath, DXGI_Format, MipMaps, LegacySupport
 Using Encoder As New DDS_Encoder("input.png", DXGI_Format.DXGI_FORMAT_BC7_UNORM, False, True)
-    Encoder.SaveImage("output.dds")
+    Encoder.Save("output.dds")
 End Using
 ```
 
 ### Decoding
 ```vbnet
 Using Decoder As New DDS_Decoder("input.dds")
-    Decoder.SaveImage("output.png", Imaging.ImageFormat.Png)
+    Decoder.Save("output.png", Imaging.ImageFormat.Png)
 End Using
 ```
