@@ -140,8 +140,6 @@ Public Class DDS_Encoder
                     GreenBitMask = {0, &HFF, 0, 0}
                     BlueBitMask = {&HFF, 0, 0, 0}
                 End If
-            Case Else
-                Throw New ArgumentException($"Unsupported format: {Format.ToString()}.")
         End Select
         If LegacySupport Then
             HasExtendedHeader = False
@@ -220,7 +218,7 @@ Public Class DDS_Encoder
 
     End Sub
 
-    Public Sub BeginEncode()
+    Private Sub BeginEncode()
         Dim TempBytes As Byte()
         Dim TempWidth As Integer = Width
         Dim TempHeight As Integer = Height
@@ -535,7 +533,7 @@ Public Class DDS_Encoder
         BitConverter.GetBytes(ColorTable).CopyTo(Result, OutputOffset + 4)
     End Sub
 
-    Public Sub SaveImage(FilePath As String)
+    Public Sub Save(FilePath As String)
         BeginEncode()
         File.WriteAllBytes(FilePath, PayloadBytes)
     End Sub

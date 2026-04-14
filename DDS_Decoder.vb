@@ -98,7 +98,7 @@ Public Class DDS_Decoder
 
     End Sub
 
-    Public Sub BeginDecode()
+    Private Sub BeginDecode()
         Dim AlphaMode As Integer = 0
         Dim CompressionMode As Integer = 0
         Dim BytesToRead As Integer = 0
@@ -106,34 +106,34 @@ Public Class DDS_Decoder
         If ExtendedHeader Then
             DataOffset = 148
             Select Case DXGIFormat
-                Case DXGI_Format.DXGI_FORMAT_BC1_UNORM
+                Case &H46, &H47, &H48 ' BC1 Typeless, UNORM, SRGB
                     CompressionMode = If(MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_OPAQUE, 0, 1)
                     BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 8
-                Case DXGI_Format.DXGI_FORMAT_BC2_UNORM
+                Case &H49, &H4A, &H4B ' BC2 Typeless, UNORM, SRGB
                     CompressionMode = 2
                     BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 16
-                Case DXGI_Format.DXGI_FORMAT_BC3_UNORM
+                Case &H4C, &H4D, &H4E ' BC3 Typeless, UNORM, SRGB
                     CompressionMode = 3
                     BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 16
-                Case DXGI_Format.DXGI_FORMAT_BC4_UNORM
+                Case &H4F, &H50 ' BC4 Typeless, UNORM
                     CompressionMode = 4
                     BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 8
-                Case DXGI_Format.DXGI_FORMAT_BC5_UNORM
+                Case &H52, &H53 ' BC5 Typeless, UNORM
                     CompressionMode = 5
                     BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 16
-                Case DXGI_Format.DXGI_FORMAT_BC7_UNORM
+                Case &H61, &H62, &H63 ' BC7 Typeless, UNORM, SRGB
                     CompressionMode = 7
                     BytesToRead = Math.Max(1, (Width + 3) \ 4) * Math.Max(1, (Height + 3) \ 4) * 16
-                Case DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM
+                Case &H57, &H5A, &H5B ' B8G8R8A8 Typeless, UNORM, SRGB
                     CompressionMode = -1
                     AlphaMode = 2
                     BytesToRead = Width * Height * 4
-                Case DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM
+                Case &H58, &H5C, &H5D ' B8G8R8X8 Typeless, UNORM, SRGB
                     CompressionMode = -1
                     AlphaMode = 0
                     BytesToRead = Width * Height * 4
                 Case Else
-                    Throw New Exception("Unsupported DXGI Format!")
+                    Throw New Exception("Unsupported DXGI Format: " & DXGIFormat.ToString.Replace("DXGI_FORMAT_", ""))
             End Select
         Else
             If (PixelFlags And DDS_PixelFlags.DDPF_FOURCC) = DDS_PixelFlags.DDPF_FOURCC Then
@@ -815,7 +815,7 @@ Public Class DDS_Decoder
 
 #End Region
 
-    Public Sub SaveImage(Path As String, Format As ImageFormat)
+    Public Sub Save(Path As String, Format As ImageFormat)
         BeginDecode()
         Using TempImage As New Bitmap(Width, Height, PixelFormat.Format32bppArgb)
             Dim Rect As New Rectangle(0, 0, Width, Height)
@@ -826,7 +826,7 @@ Public Class DDS_Decoder
         End Using
     End Sub
 
-    Public Function GetPreviewImage() As Image
+    Public Function ToBitmap() As Bitmap
         BeginDecode()
         Dim TempImage As New Bitmap(Width, Height, PixelFormat.Format32bppArgb)
         Dim Rect As New Rectangle(0, 0, Width, Height)
