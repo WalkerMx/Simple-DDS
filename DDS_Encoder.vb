@@ -53,6 +53,11 @@ Public Class DDS_Encoder
     Private HeaderBytes As Byte()
     Private PayloadBytes As Byte()
 
+    <ThreadStatic> Private Shared BufferA As Integer()
+    <ThreadStatic> Private Shared BufferB As Integer()
+    <ThreadStatic> Private Shared BufferC As Integer()
+    <ThreadStatic> Private Shared BufferD As Integer()
+
     ''' <summary>
     ''' Creates a DDS Image by explicitly defining the target DXGI Format. Header specifications are automatically inferred.
     ''' </summary>
@@ -276,6 +281,12 @@ Public Class DDS_Encoder
         Dim BlockHeight As Integer = Math.Max(1, (Height + 3) \ 4)
         Dim Result(BlockWidth * BlockHeight * BytesPerBlock - 1) As Byte
         Parallel.For(0, BlockHeight, Options, Sub(yBlock)
+                                                  If BufferA Is Nothing Then
+                                                      BufferA = New Integer(15) {}
+                                                      BufferB = New Integer(15) {}
+                                                      BufferC = New Integer(15) {}
+                                                      BufferD = New Integer(15) {}
+                                                  End If
                                                   Dim yPixelBase As Integer = yBlock * 4
                                                   Dim rowOutputOffset As Integer = yBlock * BlockWidth * BytesPerBlock
                                                   For xBlock As Integer = 0 To BlockWidth - 1
@@ -283,34 +294,33 @@ Public Class DDS_Encoder
                                                       Dim currentBlockOffset As Integer = rowOutputOffset + (xBlock * BytesPerBlock)
                                                       Select Case CompressionMode
                                                           Case 0 ' BC1
-                                                              EncodeBlockBC1(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset)
+                                                              EncodeBlockBC1(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset, BufferA)
                                                           Case 1 ' BC1a
-                                                              EncodeBlockBC1(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset)
+                                                              EncodeBlockBC1(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset, BufferA)
                                                           Case 2 ' BC2
                                                               EncodeBlockBC2(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset)
-                                                              EncodeBlockBC1(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset + 8)
+                                                              EncodeBlockBC1(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset + 8, BufferA)
                                                           Case 3 ' BC3
-                                                              EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 3, Result, currentBlockOffset)
-                                                              EncodeBlockBC1(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset + 8)
+                                                              EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 3, Result, currentBlockOffset, BufferA)
+                                                              EncodeBlockBC1(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset + 8, BufferB)
                                                           Case 4 ' BC4
-                                                              EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 2, Result, currentBlockOffset)
+                                                              EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 2, Result, currentBlockOffset, BufferA)
                                                           Case 5 ' BC5
-                                                              EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 2, Result, currentBlockOffset)
-                                                              EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 1, Result, currentBlockOffset + 8)
+                                                              EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 2, Result, currentBlockOffset, BufferA)
+                                                              EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 1, Result, currentBlockOffset + 8, BufferB)
                                                           Case 7 ' BC7 (Mode 6)
-                                                              EncodeBlockBC7(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset)
+                                                              EncodeBlockBC7(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset, BufferA, BufferB, BufferC, BufferD)
                                                       End Select
                                                   Next
                                               End Sub)
         Return Result
     End Function
 
-    Private Sub EncodeBlockBC7(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, Result As Byte(), OutputOffset As Integer)
+    Private Sub EncodeBlockBC7(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, Result As Byte(), OutputOffset As Integer, LocalB() As Integer, LocalG() As Integer, LocalR() As Integer, LocalA() As Integer)
         Dim MinB As Integer = 255, MaxB As Integer = 0
         Dim MinG As Integer = 255, MaxG As Integer = 0
         Dim MinR As Integer = 255, MaxR As Integer = 0
         Dim MinA As Integer = 255, MaxA As Integer = 0
-        Dim LocalB(15) As Integer, LocalG(15) As Integer, LocalR(15) As Integer, LocalA(15) As Integer
         Dim idx As Integer = 0
         For j As Integer = 0 To 3
             Dim py As Integer = Math.Min(yPixelBase + j, Height - 1)
@@ -391,8 +401,7 @@ Public Class DDS_Encoder
         Next
     End Sub
 
-    Private Sub EncodeBlockBC3(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, ChannelOffset As Integer, Result As Byte(), OutputOffset As Integer)
-        Dim ChannelArray(15) As Byte
+    Private Sub EncodeBlockBC3(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, ChannelOffset As Integer, Result As Byte(), OutputOffset As Integer, ChannelArray() As Integer)
         Dim idx As Integer = 0
         For j As Integer = 0 To 3
             Dim py As Integer = Math.Min(yPixelBase + j, Height - 1)
@@ -404,8 +413,13 @@ Public Class DDS_Encoder
                 idx += 1
             Next
         Next
-        Dim Val0 As Byte = ChannelArray.Max()
-        Dim Val1 As Byte = ChannelArray.Min()
+        Dim Val0 As Byte = 0
+        Dim Val1 As Byte = 255
+        For i As Integer = 0 To 15
+            Dim LocalTemp As Byte = ChannelArray(i)
+            If LocalTemp > Val0 Then Val0 = LocalTemp
+            If LocalTemp < Val1 Then Val1 = LocalTemp
+        Next
         If Val0 = Val1 Then
             If Val0 > 0 Then
                 Val1 -= 1
@@ -457,8 +471,7 @@ Public Class DDS_Encoder
         Next
     End Sub
 
-    Private Sub EncodeBlockBC1(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, Result As Byte(), OutputOffset As Integer)
-        Dim PixelArray(15) As UShort
+    Private Sub EncodeBlockBC1(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, Result As Byte(), OutputOffset As Integer, PixelArray() As Integer)
         Dim MaxY As Integer = Height - 1
         Dim MaxX As Integer = Width - 1
         Dim MaxLum As Integer = -1
@@ -478,14 +491,11 @@ Public Class DDS_Encoder
                 Dim g As Integer = SourceData(pixelIdx + 1)
                 Dim r As Integer = SourceData(pixelIdx + 2)
                 Dim a As Integer = SourceData(pixelIdx + 3)
-                Dim pixel565 As UShort
-                Dim Lum As Integer
-                If HasAlpha AndAlso a < 128 Then
-                    pixel565 = 0
-                    Lum = 0
-                Else
+                Dim pixel565 As UShort = 0
+                Dim Lum As Integer = 0
+                If Not (HasAlpha AndAlso a < 128) Then
                     pixel565 = CUShort(((r And &HF8) << 8) Or ((g And &HFC) << 3) Or (b >> 3))
-                    Lum = ((r And &HF8) * 77) + ((g And &HFC) * 150) + ((b And &HF8) * 29)
+                    Lum = (r * 77) + (g * 151) + (b * 28)
                 End If
                 PixelArray(idx) = pixel565
                 idx += 1
