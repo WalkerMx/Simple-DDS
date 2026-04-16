@@ -1,6 +1,7 @@
-﻿Imports System.IO
+﻿Imports System.Drawing.Imaging
+Imports System.IO
+Imports System.Runtime
 Imports System.Text
-Imports System.Drawing.Imaging
 
 Public Class Form1
 
@@ -98,7 +99,7 @@ Public Class Form1
                 BenchTimer = Stopwatch.StartNew
                 For i = 0 To 49
                     Using DDSEncoder As New DDS_Encoder(OFD.FileName, targetFormat, doMipMaps, isLegacy)
-                        DDSEncoder.BeginEncode()
+                        Await Task.Run(Sub() DDSEncoder.BeginEncode())
                     End Using
                 Next
                 BenchTimer.Stop()

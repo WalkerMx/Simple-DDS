@@ -51,12 +51,14 @@ Public Class DDS_Encoder
     Private CompressionMode As Integer
 
     Private HeaderBytes As Byte()
+    Private WorkingBytes As Byte()
     Private PayloadBytes As Byte()
 
     <ThreadStatic> Private Shared BufferA As Integer()
     <ThreadStatic> Private Shared BufferB As Integer()
     <ThreadStatic> Private Shared BufferC As Integer()
     <ThreadStatic> Private Shared BufferD As Integer()
+    <ThreadStatic> Private Shared BufferE As ULong()
 
     ''' <summary>
     ''' Creates a DDS Image by explicitly defining the target DXGI Format. Header specifications are automatically inferred.
@@ -75,10 +77,15 @@ Public Class DDS_Encoder
         GreenBitMask = {0, 0, 0, 0}
         BlueBitMask = {0, 0, 0, 0}
         AlphaBitMask = {0, 0, 0, 0}
-        Using TempImage As Image = Image.FromFile(Source)
-            Width = TempImage.Width
-            Height = TempImage.Height
-            HasAlpha = Image.IsAlphaPixelFormat(TempImage.PixelFormat)
+        Using TempBitmap As Bitmap = Image.FromFile(Source)
+            Width = TempBitmap.Width
+            Height = TempBitmap.Height
+            HasAlpha = Image.IsAlphaPixelFormat(TempBitmap.PixelFormat)
+            Dim SourceRect As New Rectangle(0, 0, TempBitmap.Width, TempBitmap.Height)
+            Dim SourceData As BitmapData = TempBitmap.LockBits(SourceRect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb)
+            WorkingBytes = New Byte(SourceData.Stride * TempBitmap.Height - 1) {}
+            Marshal.Copy(SourceData.Scan0, WorkingBytes, 0, WorkingBytes.Length)
+            TempBitmap.UnlockBits(SourceData)
         End Using
         Dim DynamicAlpha As DX10_MiscFlags2 = If(HasAlpha, DX10_MiscFlags2.DDS_ALPHA_MODE_STRAIGHT, DX10_MiscFlags2.DDS_ALPHA_MODE_OPAQUE)
         Select Case Format
@@ -224,25 +231,22 @@ Public Class DDS_Encoder
     End Sub
 
     Public Sub BeginEncode()
-        Dim TempBytes As Byte()
         Dim TempWidth As Integer = Width
         Dim TempHeight As Integer = Height
         Using PayloadStream As New MemoryStream()
             PayloadStream.Write(HeaderBytes, 0, HeaderBytes.Count)
-            Using TempImage As Image = Image.FromFile(SourcePath)
-                TempBytes = ExtractBitmapBytes(TempImage)
-            End Using
-            Dim NextBytes As Byte() = GetImageData(TempBytes, TempWidth, TempHeight)
+            Dim NextBytes As Byte() = GetImageData(WorkingBytes, TempWidth, TempHeight)
             PayloadStream.Write(NextBytes, 0, NextBytes.Count)
             If HasMipMaps Then
                 For i = 0 To MipCount - 2
-                    TempBytes = HalveArray(TempBytes, TempWidth, TempHeight)
+                    WorkingBytes = HalveArray(WorkingBytes, TempWidth, TempHeight)
                     TempWidth = Math.Max(1, TempWidth >> 1)
                     TempHeight = Math.Max(1, TempHeight >> 1)
-                    NextBytes = GetImageData(TempBytes, TempWidth, TempHeight)
+                    NextBytes = GetImageData(WorkingBytes, TempWidth, TempHeight)
                     PayloadStream.Write(NextBytes, 0, NextBytes.Count)
                 Next
             End If
+            WorkingBytes = Nothing
             PayloadBytes = PayloadStream.ToArray
         End Using
     End Sub
@@ -253,15 +257,6 @@ Public Class DDS_Encoder
         Else
             Return WriteUncompressed(BitmapBytes, HasAlpha)
         End If
-    End Function
-
-    Private Function ExtractBitmapBytes(Source As Bitmap) As Byte()
-        Dim SourceRect As New Rectangle(0, 0, Source.Width, Source.Height)
-        Dim SourceData As BitmapData = Source.LockBits(SourceRect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb)
-        Dim SourceBytes(SourceData.Stride * Source.Height - 1) As Byte
-        Marshal.Copy(SourceData.Scan0, SourceBytes, 0, SourceBytes.Length)
-        Source.UnlockBits(SourceData)
-        Return SourceBytes
     End Function
 
     Private Function WriteUncompressed(SourceData As Byte(), Alpha As Boolean) As Byte()
@@ -286,6 +281,7 @@ Public Class DDS_Encoder
                                                       BufferB = New Integer(15) {}
                                                       BufferC = New Integer(15) {}
                                                       BufferD = New Integer(15) {}
+                                                      BufferE = New ULong(15) {}
                                                   End If
                                                   Dim yPixelBase As Integer = yBlock * 4
                                                   Dim rowOutputOffset As Integer = yBlock * BlockWidth * BytesPerBlock
@@ -309,14 +305,14 @@ Public Class DDS_Encoder
                                                               EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 2, Result, currentBlockOffset, BufferA)
                                                               EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 1, Result, currentBlockOffset + 8, BufferB)
                                                           Case 7 ' BC7 (Mode 6)
-                                                              EncodeBlockBC7(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset, BufferA, BufferB, BufferC, BufferD)
+                                                              EncodeBlockBC7(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset, BufferA, BufferB, BufferC, BufferD, BufferE)
                                                       End Select
                                                   Next
                                               End Sub)
         Return Result
     End Function
 
-    Private Sub EncodeBlockBC7(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, Result As Byte(), OutputOffset As Integer, LocalB() As Integer, LocalG() As Integer, LocalR() As Integer, LocalA() As Integer)
+    Private Sub EncodeBlockBC7(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, Result As Byte(), OutputOffset As Integer, LocalB() As Integer, LocalG() As Integer, LocalR() As Integer, LocalA() As Integer, ColorTable() As ULong)
         Dim MinB As Integer = 255, MaxB As Integer = 0
         Dim MinG As Integer = 255, MaxG As Integer = 0
         Dim MinR As Integer = 255, MaxR As Integer = 0
@@ -351,7 +347,6 @@ Public Class DDS_Encoder
         Dim G0 As Integer = MinG >> 1, G1 As Integer = MaxG >> 1
         Dim B0 As Integer = MinB >> 1, B1 As Integer = MaxB >> 1
         Dim A0 As Integer = MinA >> 1, A1 As Integer = MaxA >> 1
-        Dim ColorTable(15) As ULong
         Dim MinLum As Integer = MinB + (MinG << 1) + MinR + MinA
         Dim MaxLum As Integer = MaxB + (MaxG << 1) + MaxR + MaxA
         Dim Range As Single = If(MaxLum - MinLum < 1, 1.0F, CSng(MaxLum - MinLum))
@@ -432,9 +427,10 @@ Public Class DDS_Encoder
         Dim BitBuffer As Long = 0
         Dim BitsLoaded As Integer = 0
         Dim ByteOffset As Integer = OutputOffset + 2
-        For Each v In ChannelArray
+        Dim Range As Integer = CInt(Val0) - Val1
+        For i As Integer = 0 To 15
+            Dim v As Integer = ChannelArray(i)
             Dim Index As Byte
-            Dim Range As Integer = CInt(Val0) - Val1
             If v = Val0 Then
                 Index = 0
             ElseIf v = Val1 Then
