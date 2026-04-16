@@ -21,12 +21,12 @@ Comparison testing was done on a Xeon E3-1260L, strictly on the CPU.  Results ar
 ### Encoding
 | | TexConv | Simple-DDS | Delta |
 | :--- | :--- | :--- | :--- |
-| BC1 No Mips | 663.34ms | 588.74ms | 1.1x Faster |
-| BC1 Full Mips | 1,229.55ms | 831.1ms | 1.5x Faster |
-| BC3 No Mips | 1,086.78ms | 668.02ms | 1.6x Faster |
-| BC3 Full Mips | 2,063.11ms | 944.12ms | 2.2x Faster |
-| BC7 (Mode 6) No Mips | 74,101ms | 691.24ms | 107.2x Faster |
-| BC7 (Mode 6) Full Mips | 102,513ms | 980.34ms | 104.6x Faster |
+| BC1 No Mips | 663.34ms | 452.58ms | 1.5x Faster |
+| BC1 Full Mips | 1,229.55ms | 699.64ms | 1.8x Faster |
+| BC3 No Mips | 1,086.78ms | 526.18ms | 2.1x Faster |
+| BC3 Full Mips | 2,063.11ms | 814.26ms | 2.5x Faster |
+| BC7 (Mode 6) No Mips | 74,101ms | 525.54ms | 141.1x Faster |
+| BC7 (Mode 6) Full Mips | 102,513ms | 819.28ms | 125.1x Faster |
 
 ### Decoding
 | | TexConv | Simple-DDS | Delta |
