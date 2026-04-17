@@ -1,15 +1,39 @@
-﻿Imports System.Drawing.Imaging
-Imports System.IO
-Imports System.Runtime
+﻿Imports System.IO
 Imports System.Text
+Imports System.Numerics
+Imports System.Drawing.Imaging
 
 Public Class Form1
 
     Dim FilePath As String
     Dim PreviewImage As Image
 
+    Private CubeMode As Boolean = False
+    Private CubeVerts(7) As Vector3
+    Private CubeFaces(5) As CubeFace
+    Private PreviewCubeFaces(5) As CubeFace
+    Private PreviewScale As Single = 120.0F
+
+    Private Class CubeFace
+        Public Image As Bitmap
+        Public V0 As Integer
+        Public V1 As Integer
+        Public V2 As Integer
+        Public V3 As Integer
+        Public Normal As Vector3
+    End Class
+
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        DoubleBuffered = True
         OutputFormatComboBox.SelectedIndex = 0
+        CubeVerts(0) = New Vector3(-1, 1, 1)
+        CubeVerts(1) = New Vector3(1, 1, 1)
+        CubeVerts(2) = New Vector3(1, -1, 1)
+        CubeVerts(3) = New Vector3(-1, -1, 1)
+        CubeVerts(4) = New Vector3(-1, 1, -1)
+        CubeVerts(5) = New Vector3(1, 1, -1)
+        CubeVerts(6) = New Vector3(1, -1, -1)
+        CubeVerts(7) = New Vector3(-1, -1, -1)
     End Sub
 
     Private Async Sub LoadImageButton_Click(sender As Object, e As EventArgs) Handles LoadImageButton.Click
@@ -18,13 +42,23 @@ Public Class Form1
                 Dim Extension As String = Path.GetExtension(OFD.FileName).ToLower
                 InfoTextBox.Clear()
                 If PreviewImage IsNot Nothing Then PreviewImage.Dispose()
+                DisposeCubeFaces()
                 FilePath = OFD.FileName
                 Dim ResultText As String = ""
                 If Extension = ".dds" Then
                     Try
                         Using DDSDecoder As New DDS_Decoder(OFD.FileName)
                             InfoTextBox.Text = GetDDSReport(DDSDecoder)
-                            PreviewImage = Await Task.Run(Function() DDSDecoder.ToBitmap())
+                            If DDSDecoder.IsCubeMap Then
+                                CubeMode = True
+                                Dim TempCubeMaps As Bitmap() = Await Task.Run(Function() DDSDecoder.ToCubeBitmaps())
+                                LoadCubeMaps(PreviewCubeFaces, TempCubeMaps)
+
+                                LoadCubeMaps(CubeFaces, TempCubeMaps)
+                            Else
+                                CubeMode = False
+                                PreviewImage = Await Task.Run(Function() DDSDecoder.ToBitmap())
+                            End If
                         End Using
                         DDSExportGroup.Enabled = False
                         ImageExportGroup.Enabled = True
@@ -42,7 +76,11 @@ Public Class Form1
                     DDSExportGroup.Enabled = True
                     ImageExportGroup.Enabled = False
                 End If
-                PreviewPictureBox.Image = PreviewImage
+                If CubeMode Then
+                    PreviewPictureBox.Image = Nothing
+                Else
+                    PreviewPictureBox.Image = PreviewImage
+                End If
                 Me.Refresh()
             End If
         End Using
@@ -86,29 +124,79 @@ Public Class Form1
         End Using
     End Sub
 
-    Private Async Sub BenchButton_Click(sender As Object, e As EventArgs) Handles BenchButton.Click
-        Using OFD As New OpenFileDialog With {.Filter = "Image Files|*.png;*.jpg;*.bmp"}
-            If OFD.ShowDialog = DialogResult.OK Then
-                Dim targetFormat As DXGI_Format = GetFormatFromString(OverrideComboBox.SelectedItem.ToString())
-                Dim isLegacy As Boolean = Not ExtendedHeaderCheckBox.Checked
-                Dim doMipMaps As Boolean = MipMapCheckBox.Checked
-                Dim BenchTime As Integer = 0
-                Dim BenchTimer As Stopwatch
-                LoadImageButton.Enabled = False
-                ExportDDSButton.Enabled = False
-                BenchTimer = Stopwatch.StartNew
-                For i = 0 To 49
-                    Using DDSEncoder As New DDS_Encoder(OFD.FileName, targetFormat, doMipMaps, isLegacy)
-                        Await Task.Run(Sub() DDSEncoder.BeginEncode())
+    Private Sub PictureBox1_Paint(sender As Object, e As PaintEventArgs) Handles PreviewPictureBox.Paint
+        If CubeMode Then
+            TrackBarH.Visible = True
+            TrackBarV.Visible = True
+            e.Graphics.SmoothingMode = Drawing2D.SmoothingMode.None
+            e.Graphics.InterpolationMode = Drawing2D.InterpolationMode.NearestNeighbor
+            e.Graphics.PixelOffsetMode = Drawing2D.PixelOffsetMode.Half
+            Dim CubeYaw As Single = CSng(TrackBarH.Value * (Math.PI / 180.0))
+            Dim CubePitch As Single = CSng(-TrackBarV.Value * (Math.PI / 180.0))
+            Dim RotationMatrix As Matrix4x4 = Matrix4x4.CreateFromYawPitchRoll(CubeYaw, CubePitch, 0)
+            Dim LightDir As Vector3 = Vector3.Normalize(New Vector3(-0.5F, 0.5F, 1.0F))
+            Dim OffsetX As Single = PreviewPictureBox.Width / 2.0F
+            Dim OffsetY As Single = PreviewPictureBox.Height / 2.0F
+            Dim PreviewPoints(7) As PointF
+            For i As Integer = 0 To 7
+                Dim Rotation As Vector3 = Vector3.Transform(CubeVerts(i), RotationMatrix)
+                PreviewPoints(i) = New PointF(OffsetX + (Rotation.X * PreviewScale), OffsetY - (Rotation.Y * PreviewScale))
+            Next
+            For Each Face In CubeFaces
+                Dim RotationNormal As Vector3 = Vector3.Transform(Face.Normal, RotationMatrix)
+                If RotationNormal.Z > 0 Then
+                    Dim DestPoints() As PointF = {PreviewPoints(Face.V0), PreviewPoints(Face.V1), PreviewPoints(Face.V3)}
+                    Dim BottomRight As New PointF(DestPoints(1).X + DestPoints(2).X - DestPoints(0).X, DestPoints(1).Y + DestPoints(2).Y - DestPoints(0).Y)
+                    Dim CenterX As Single = (DestPoints(0).X + BottomRight.X) / 2.0F
+                    Dim CenterY As Single = (DestPoints(0).Y + BottomRight.Y) / 2.0F
+                    Dim overlap As Single = 0.5F
+                    For p As Integer = 0 To 2
+                        Dim dx As Single = DestPoints(p).X - CenterX
+                        Dim dy As Single = DestPoints(p).Y - CenterY
+                        Dim len As Single = CSng(Math.Sqrt(dx * dx + dy * dy))
+                        If len > 0 Then
+                            DestPoints(p).X += (dx / len) * overlap
+                            DestPoints(p).Y += (dy / len) * overlap
+                        End If
+                    Next
+                    Dim normNormal As Vector3 = Vector3.Normalize(RotationNormal)
+                    Dim dot As Single = Vector3.Dot(normNormal, LightDir)
+                    Dim brightness As Single = 0.3F + (Math.Max(0, dot) * 0.7F)
+                    Dim cm As New ColorMatrix(New Single()() {
+                                              New Single() {brightness, 0, 0, 0, 0},
+                                              New Single() {0, brightness, 0, 0, 0},
+                                              New Single() {0, 0, brightness, 0, 0},
+                                              New Single() {0, 0, 0, 1, 0},
+                                              New Single() {0, 0, 0, 0, 1}})
+                    Using imgAttr As New ImageAttributes()
+                        imgAttr.SetWrapMode(Drawing2D.WrapMode.TileFlipXY)
+                        imgAttr.SetColorMatrix(cm)
+                        Dim srcRect As New Rectangle(0, 0, Face.Image.Width, Face.Image.Height)
+                        e.Graphics.DrawImage(Face.Image, DestPoints, srcRect, GraphicsUnit.Pixel, imgAttr)
                     End Using
-                Next
-                BenchTimer.Stop()
-                BenchTime = BenchTimer.ElapsedMilliseconds
-                MsgBox($"Average: {BenchTime / 50}ms")
-                ExportDDSButton.Enabled = True
-                LoadImageButton.Enabled = True
-            End If
-        End Using
+                End If
+            Next
+        Else
+            TrackBarH.Visible = False
+            TrackBarV.Visible = False
+        End If
+    End Sub
+
+    Private Sub TrackBarH_Scroll(sender As Object, e As EventArgs) Handles TrackBarH.Scroll, TrackBarH.ValueChanged
+        PreviewPictureBox.Invalidate()
+    End Sub
+
+    Private Sub TrackBarV_Scroll(sender As Object, e As EventArgs) Handles TrackBarV.Scroll, TrackBarV.ValueChanged
+        PreviewPictureBox.Invalidate()
+    End Sub
+
+    Private Sub LoadCubeMaps(CubeFaces As CubeFace(), CubeMapImages As Bitmap())
+        CubeFaces(0) = New CubeFace With {.V0 = 0, .V1 = 1, .V2 = 2, .V3 = 3, .Normal = New Vector3(0, 0, 1), .Image = CubeMapImages(4)}   ' Z+
+        CubeFaces(1) = New CubeFace With {.V0 = 5, .V1 = 4, .V2 = 7, .V3 = 6, .Normal = New Vector3(0, 0, -1), .Image = CubeMapImages(5)}  ' Z-
+        CubeFaces(2) = New CubeFace With {.V0 = 4, .V1 = 5, .V2 = 1, .V3 = 0, .Normal = New Vector3(0, 1, 0), .Image = CubeMapImages(2)}   ' Y+
+        CubeFaces(3) = New CubeFace With {.V0 = 3, .V1 = 2, .V2 = 6, .V3 = 7, .Normal = New Vector3(0, -1, 0), .Image = CubeMapImages(3)}  ' Y-
+        CubeFaces(4) = New CubeFace With {.V0 = 4, .V1 = 0, .V2 = 3, .V3 = 7, .Normal = New Vector3(-1, 0, 0), .Image = CubeMapImages(1)}  ' X-
+        CubeFaces(5) = New CubeFace With {.V0 = 1, .V1 = 5, .V2 = 6, .V3 = 2, .Normal = New Vector3(1, 0, 0), .Image = CubeMapImages(0)}   ' X+
     End Sub
 
     Public Sub UpdateOverrideFormats(sender As Object, e As EventArgs) Handles CompressionCheckBox.CheckedChanged, SmoothAlphaRB.CheckedChanged, SharpAlphaRB.CheckedChanged, NoAlphaRB.CheckedChanged, ExtendedHeaderCheckBox.CheckedChanged, NormalCheckBox.CheckedChanged
@@ -171,12 +259,6 @@ Public Class Form1
                 Throw New Exception($"Unsupported format: {FormatName}")
         End Select
     End Function
-
-    Private Sub SelectFirstItem(SourceControl As ComboBox)
-        If SourceControl.Items.Count > 0 Then
-            SourceControl.SelectedIndex = 0
-        End If
-    End Sub
 
     Public Function GetDDSReport(Source As DDS_Decoder) As String
         Dim sb As New StringBuilder()
@@ -252,5 +334,20 @@ Public Class Form1
         If format.Equals(ImageFormat.MemoryBmp) Then Return "Memory Bitmap"
         Return "Unknown/Custom Format"
     End Function
+
+    Private Sub DisposeCubeFaces()
+        For Each Face In CubeFaces
+            If Face IsNot Nothing AndAlso Face.Image IsNot Nothing Then
+                Face.Image.Dispose()
+                Face.Image = Nothing
+            End If
+        Next
+    End Sub
+
+    Private Sub SelectFirstItem(SourceControl As ComboBox)
+        If SourceControl.Items.Count > 0 Then
+            SourceControl.SelectedIndex = 0
+        End If
+    End Sub
 
 End Class
