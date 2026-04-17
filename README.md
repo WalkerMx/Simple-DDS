@@ -16,6 +16,20 @@ A lightweight, fully managed DDS encoder and decoder. Simple-DDS provides a zero
 * **3D CubeMap Previews:** Full 3D previewing of CubeMaps with rotation.
 * **Robust Header Support:** Capable of reading and validating any DDS header, and reporting complete specifications.
 
+## Minimum Specifications
+* **Operating System:** Windows 7 SP1 (x86) with .NET Framework 4.7.2
+* **Processor:** Dual-Core CPU (e.g., Intel Pentium G-series / Core2 Duo)
+* **Memory:** 4 GB RAM
+* **Storage:** >128 KB available space
+* **Graphics:** Integrated Graphics or any DirectX 9.0c compatible GPU with 128MB of VRAM
+
+## Recommended Specifications
+* **Operating System:** Windows 10 / 11 (x64)
+* **Processor:** Quad-Core CPU or better
+* **Memory:** 8 GB RAM
+* **Storage:** Any SSD (SATA or NVMe)
+* **Graphics:** Any Dedicated GPU (e.g. GTX 600 Series with 1GB VRAM)
+
 ## Performance
 
 Comparison testing was done on a Xeon E3-1260L, strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses BC7 Mode 6 only, for fast, high-quality block compression.
