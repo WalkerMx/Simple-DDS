@@ -106,7 +106,7 @@ Public Class DDS_Decoder
         End Using
     End Sub
 
-    Private Sub BeginDecode(Optional MipMapOffset As Long = -1)
+    Public Sub BeginDecode(Optional MipMapOffset As Long = -1)
         Dim Offset As Long = If(MipMapOffset <> -1, MipMapOffset, If(ExtendedHeader, 148, 128))
         Dim AlphaMode As Integer = 0
         Dim CompressionMode As Integer = 0

@@ -9,9 +9,12 @@ Public Class Form1
     Dim PreviewImage As Image
 
     Private CubeMode As Boolean = False
+    Private IsDragging As Boolean = False
+    Private LastMousePos As Point
     Private CubeVerts(7) As Vector3
     Private CubeFaces(5) As CubeFace
-    Private PreviewScale As Single = 120.0F
+    Private CubeScale As Single = 120.0F
+    Private CubeOrientation As Quaternion = Quaternion.Identity
 
     Private Class CubeFace
         Public Image As Bitmap
@@ -104,11 +107,11 @@ Public Class Form1
                 Else
                     Select Case FileExt
                         Case "PNG"
-                            PreviewImage.Save(SFD.FileName, ImageFormat.Png)
+                            PreviewImage.Save(SFD.FileName & ".png", ImageFormat.Png)
                         Case "JPG"
-                            PreviewImage.Save(SFD.FileName, ImageFormat.Jpeg)
+                            PreviewImage.Save(SFD.FileName & ".jpg", ImageFormat.Jpeg)
                         Case "BMP"
-                            PreviewImage.Save(SFD.FileName, ImageFormat.Bmp)
+                            PreviewImage.Save(SFD.FileName & ".bmp", ImageFormat.Bmp)
                     End Select
                 End If
                 ExportImageButton.Enabled = True
@@ -135,23 +138,85 @@ Public Class Form1
         End Using
     End Sub
 
+    Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
+        Dim BenchTime As Integer = 0
+        Dim BenchTimer As Stopwatch
+        If MessageBox.Show("Encode?", "", MessageBoxButtons.YesNo) = DialogResult.Yes Then
+            Using OFD As New OpenFileDialog With {.Filter = "Image Files|*.png;*.jpg;*.bmp"}
+                If OFD.ShowDialog = DialogResult.OK Then
+                    Dim targetFormat As DXGI_Format = GetFormatFromString(OverrideComboBox.SelectedItem.ToString())
+                    Dim isLegacy As Boolean = Not ExtendedHeaderCheckBox.Checked
+                    Dim doMipMaps As Boolean = MipMapCheckBox.Checked
+                    BenchTimer = Stopwatch.StartNew
+                    For i = 0 To 9
+                        Using Encoder As New DDS_Encoder(OFD.FileName, targetFormat, doMipMaps, isLegacy)
+                            Encoder.BeginEncode()
+                        End Using
+                    Next
+                    BenchTimer.Stop()
+                    BenchTime = BenchTimer.ElapsedMilliseconds
+                    MsgBox($"Average: {BenchTime / 10}")
+                End If
+            End Using
+        Else
+            Using OFD As New OpenFileDialog With {.Filter = "Image Files|*.dds"}
+                If OFD.ShowDialog = DialogResult.OK Then
+                    BenchTimer = Stopwatch.StartNew
+                    For i = 0 To 9
+                        Using Decoder As New DDS_Decoder(OFD.FileName)
+                            Decoder.BeginDecode()
+                        End Using
+                    Next
+                    BenchTimer.Stop()
+                    BenchTime = BenchTimer.ElapsedMilliseconds
+                    MsgBox($"Average: {BenchTime / 10}")
+                End If
+            End Using
+        End If
+    End Sub
+
+    Private Sub PreviewPictureBox_MouseDown(sender As Object, e As MouseEventArgs) Handles PreviewPictureBox.MouseDown
+        If e.Button = MouseButtons.Left Then
+            IsDragging = True
+            LastMousePos = e.Location
+        ElseIf e.Button = MouseButtons.Right Then
+            CubeOrientation = Quaternion.Identity
+            PreviewPictureBox.Invalidate()
+        End If
+    End Sub
+
+    Private Sub PreviewPictureBox_MouseUp(sender As Object, e As MouseEventArgs) Handles PreviewPictureBox.MouseUp
+        IsDragging = False
+    End Sub
+
+    Private Sub PreviewPictureBox_MouseMove(sender As Object, e As MouseEventArgs) Handles PreviewPictureBox.MouseMove
+        If e.Button = MouseButtons.Left Then
+            Dim DeltaX As Single = (e.X - LastMousePos.X) * 0.01F
+            Dim DeltaY As Single = (e.Y - LastMousePos.Y) * 0.01F
+            Dim rotY As Quaternion = Quaternion.CreateFromAxisAngle(Vector3.UnitY, DeltaX)
+            Dim rotX As Quaternion = Quaternion.CreateFromAxisAngle(Vector3.UnitX, DeltaY)
+            CubeOrientation = Quaternion.Concatenate(CubeOrientation, rotY)
+            CubeOrientation = Quaternion.Concatenate(CubeOrientation, rotX)
+            LastMousePos = e.Location
+            PreviewPictureBox.Invalidate()
+        Else
+            LastMousePos = e.Location
+        End If
+    End Sub
+
     Private Sub PictureBox1_Paint(sender As Object, e As PaintEventArgs) Handles PreviewPictureBox.Paint
         If CubeMode Then
-            TrackBarH.Visible = True
-            TrackBarV.Visible = True
-            e.Graphics.SmoothingMode = Drawing2D.SmoothingMode.None
+            e.Graphics.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
             e.Graphics.InterpolationMode = Drawing2D.InterpolationMode.NearestNeighbor
             e.Graphics.PixelOffsetMode = Drawing2D.PixelOffsetMode.Half
-            Dim CubeYaw As Single = CSng(TrackBarH.Value * (Math.PI / 180.0))
-            Dim CubePitch As Single = CSng(-TrackBarV.Value * (Math.PI / 180.0))
-            Dim RotationMatrix As Matrix4x4 = Matrix4x4.CreateFromYawPitchRoll(CubeYaw, CubePitch, 0)
+            Dim RotationMatrix As Matrix4x4 = Matrix4x4.CreateFromQuaternion(CubeOrientation)
             Dim LightDir As Vector3 = Vector3.Normalize(New Vector3(-0.5F, 0.5F, 1.0F))
             Dim OffsetX As Single = PreviewPictureBox.Width / 2.0F
             Dim OffsetY As Single = PreviewPictureBox.Height / 2.0F
             Dim PreviewPoints(7) As PointF
             For i As Integer = 0 To 7
                 Dim Rotation As Vector3 = Vector3.Transform(CubeVerts(i), RotationMatrix)
-                PreviewPoints(i) = New PointF(OffsetX + (Rotation.X * PreviewScale), OffsetY - (Rotation.Y * PreviewScale))
+                PreviewPoints(i) = New PointF(OffsetX + (Rotation.X * CubeScale), OffsetY - (Rotation.Y * CubeScale))
             Next
             For Each Face In CubeFaces
                 Dim RotationNormal As Vector3 = Vector3.Transform(Face.Normal, RotationMatrix)
@@ -187,18 +252,7 @@ Public Class Form1
                     End Using
                 End If
             Next
-        Else
-            TrackBarH.Visible = False
-            TrackBarV.Visible = False
         End If
-    End Sub
-
-    Private Sub TrackBarH_Scroll(sender As Object, e As EventArgs) Handles TrackBarH.Scroll, TrackBarH.ValueChanged
-        PreviewPictureBox.Invalidate()
-    End Sub
-
-    Private Sub TrackBarV_Scroll(sender As Object, e As EventArgs) Handles TrackBarV.Scroll, TrackBarV.ValueChanged
-        PreviewPictureBox.Invalidate()
     End Sub
 
     Private Sub LoadCubeMaps(CubeFaces As CubeFace(), CubeMapImages As Bitmap())

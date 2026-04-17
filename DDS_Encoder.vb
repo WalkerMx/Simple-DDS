@@ -230,7 +230,7 @@ Public Class DDS_Encoder
 
     End Sub
 
-    Private Sub BeginEncode()
+    Public Sub BeginEncode()
         Dim TempWidth As Integer = Width
         Dim TempHeight As Integer = Height
         Using PayloadStream As New MemoryStream()
