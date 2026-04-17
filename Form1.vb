@@ -11,7 +11,6 @@ Public Class Form1
     Private CubeMode As Boolean = False
     Private CubeVerts(7) As Vector3
     Private CubeFaces(5) As CubeFace
-    Private PreviewCubeFaces(5) As CubeFace
     Private PreviewScale As Single = 120.0F
 
     Private Class CubeFace
@@ -45,6 +44,7 @@ Public Class Form1
                 DisposeCubeFaces()
                 FilePath = OFD.FileName
                 Dim ResultText As String = ""
+                CubeMode = False
                 If Extension = ".dds" Then
                     Try
                         Using DDSDecoder As New DDS_Decoder(OFD.FileName)
@@ -52,11 +52,8 @@ Public Class Form1
                             If DDSDecoder.IsCubeMap Then
                                 CubeMode = True
                                 Dim TempCubeMaps As Bitmap() = Await Task.Run(Function() DDSDecoder.ToCubeBitmaps())
-                                LoadCubeMaps(PreviewCubeFaces, TempCubeMaps)
-
                                 LoadCubeMaps(CubeFaces, TempCubeMaps)
                             Else
-                                CubeMode = False
                                 PreviewImage = Await Task.Run(Function() DDSDecoder.ToBitmap())
                             End If
                         End Using
@@ -88,18 +85,32 @@ Public Class Form1
 
     Private Sub ExportImageButton_Click(sender As Object, e As EventArgs) Handles ExportImageButton.Click
         Dim FileExt As String = OutputFormatComboBox.SelectedItem.ToString
-        Using SFD As New SaveFileDialog With {.Filter = $"{FileExt} Files|*.{FileExt.ToLower}|All Files|*.*", .FileName = Path.GetFileNameWithoutExtension(FilePath)}
+        Using SFD As New SaveFileDialog With {.Filter = $"{FileExt} Files|*.{FileExt.ToLower}|All Files|*.*", .FileName = Path.GetFileNameWithoutExtension(FilePath), .AddExtension = False}
             If SFD.ShowDialog = DialogResult.OK Then
                 LoadImageButton.Enabled = False
                 ExportImageButton.Enabled = False
-                Select Case FileExt
-                    Case "PNG"
-                        PreviewImage.Save(SFD.FileName, ImageFormat.Png)
-                    Case "JPG"
-                        PreviewImage.Save(SFD.FileName, ImageFormat.Jpeg)
-                    Case "BMP"
-                        PreviewImage.Save(SFD.FileName, ImageFormat.Bmp)
-                End Select
+                If CubeMode Then
+                    Dim ExtFaceList As String() = {"_PZ", "_NZ", "_PY", "_NY", "_NX", "_PX"}
+                    For i = 0 To 5
+                        Select Case FileExt
+                            Case "PNG"
+                                CubeFaces(i).Image.Save(SFD.FileName & ExtFaceList(i) & ".png", ImageFormat.Png)
+                            Case "JPG"
+                                CubeFaces(i).Image.Save(SFD.FileName & ExtFaceList(i) & ".jpg", ImageFormat.Jpeg)
+                            Case "BMP"
+                                CubeFaces(i).Image.Save(SFD.FileName & ExtFaceList(i) & ".bmp", ImageFormat.Bmp)
+                        End Select
+                    Next
+                Else
+                    Select Case FileExt
+                        Case "PNG"
+                            PreviewImage.Save(SFD.FileName, ImageFormat.Png)
+                        Case "JPG"
+                            PreviewImage.Save(SFD.FileName, ImageFormat.Jpeg)
+                        Case "BMP"
+                            PreviewImage.Save(SFD.FileName, ImageFormat.Bmp)
+                    End Select
+                End If
                 ExportImageButton.Enabled = True
                 LoadImageButton.Enabled = True
             End If
