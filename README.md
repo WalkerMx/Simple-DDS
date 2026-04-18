@@ -1,5 +1,4 @@
 # Simple DDS Encoder/Decoder (VB.NET)
-
 A lightweight, fully managed DDS encoder and decoder. Simple-DDS provides a zero-dependency solution for handling 2D DirectDraw Surface Textures in .NET, utilizing parallel processing for high performance.
 
 ## Class Features
@@ -8,7 +7,7 @@ A lightweight, fully managed DDS encoder and decoder. Simple-DDS provides a zero
     * **Decoding:** BC1 (DXT1), BC2 (DXT3), BC3 (DXT5), BC4 (ATI1), BC5 (ATI2), and BC7 (Full).
 * **MipMaps:** Automated chain generation using box-filter downsampling.
 * **CubeMaps:** Automated decoding and saving of CubeMap arrays.
-* **Headers:** Supports Legacy FourCC and modern **DX10 (DXGI_Format)** extended headers.
+* **Headers:** Supports Legacy FourCC and modern DX10 (DXGI_Format) extended headers.
 
 ## Demo App (TexInspect)
 * **Tiny Footprint:** Under 100Kb, portable even if you use Floppy Disks.
@@ -16,22 +15,22 @@ A lightweight, fully managed DDS encoder and decoder. Simple-DDS provides a zero
 * **3D CubeMap Previews:** Full 3D previewing of CubeMaps with rotation.
 * **Robust Header Support:** Capable of reading and validating any DDS header, and reporting complete specifications.
 
-## Minimum Specifications
+## System Requirements
+### Minimum
 * **Operating System:** Windows 7 SP1 (x86) with .NET Framework 4.7.2
 * **Processor:** Dual-Core CPU (e.g., Intel Pentium G-series / Core2 Duo)
 * **Memory:** 4 GB RAM
 * **Storage:** >128 KB available space
 * **Graphics:** Integrated Graphics or any DirectX 9.0c compatible GPU with 128MB of VRAM
-
-## Recommended Specifications
+### Recommended
 * **Operating System:** Windows 10 / 11 (x64)
 * **Processor:** Quad-Core CPU or better
 * **Memory:** 8 GB RAM
 * **Storage:** Any SSD (SATA or NVMe)
 * **Graphics:** Any Dedicated GPU (e.g. GTX 600 Series with 1GB VRAM)
+> GPU requirements are recommended minimums for the OS.  Simple-DDS is GPU-agnostic.
 
 ## Performance
-
 Comparison testing was done on a Xeon E3-1260L, strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses BC7 Mode 6 only, for fast, high-quality block compression.
 
 ### Encoding
@@ -52,9 +51,7 @@ Comparison testing was done on a Xeon E3-1260L, strictly on the CPU.  Results ar
 | BC7 to PNG | 2,993.03ms | 620.08ms | 4.8x Faster |
 
 ## Quality
-
 Kodak Lossless TrueColor Image Suite SSIM Benchmark (24 Images)
-
 | | TexConv BC7 | Simple-DDS BC7 | TexConv BC3 | Simple-DDS BC3 |
 | :--- | :--- | :--- | :--- | :--- |
 | **Average** | 0.9909 | 0.9858 | 0.9561 | 0.9454 |
@@ -62,7 +59,6 @@ Kodak Lossless TrueColor Image Suite SSIM Benchmark (24 Images)
 > SSIM Reference: 1.0 = Lossless | >0.98 = Indistinguishable | >0.95 = Excellent | >0.90 = Acceptable
 
 ## Usage Examples
-
 ### Encoding
 ```vbnet
 'SourcePath, DXGI_Format, MipMaps, LegacySupport
@@ -70,7 +66,6 @@ Using Encoder As New DDS_Encoder("input.png", DXGI_Format.DXGI_FORMAT_BC7_UNORM,
     Encoder.Save("output.dds")
 End Using
 ```
-
 ### Decoding
 ```vbnet
 Using Decoder As New DDS_Decoder("input.dds")
