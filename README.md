@@ -7,7 +7,7 @@ A lightweight, fully managed DDS encoder and decoder. TexInspect is a zero-depen
 * **3D CubeMap Previews:** Full 3D previewing of CubeMaps with rotation.
 * **Robust Header Support:** Capable of reading and validating any DDS header, and reporting complete specifications.
 
-## Class Features
+## Common Features
 * **Supported Modes:**
     * **Encoding:** BC1 (DXT1), BC2 (DXT3), BC3 (DXT5), BC4 (ATI1), BC5 (ATI2), and BC7 (Lite).
     * **Decoding:** BC1 (DXT1), BC2 (DXT3), BC3 (DXT5), BC4 (ATI1), BC5 (ATI2), and BC7 (Full).
@@ -28,10 +28,10 @@ A lightweight, fully managed DDS encoder and decoder. TexInspect is a zero-depen
 * **Memory:** 8 GB RAM
 * **Storage:** Any SSD (SATA or NVMe)
 * **Graphics:** Any Dedicated GPU (e.g. GTX 600 Series with 1GB VRAM)
-> GPU requirements are recommended minimums for the OS.  Simple-DDS is GPU-agnostic.
+> GPU requirements are recommended minimums for the OS.  TexInspect is GPU-agnostic.
 
 ## Performance
-Comparison testing was done on a Xeon E3-1260L (2011), strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses BC7 Mode 6 only, for fast, high-quality block compression.
+Comparison testing was done on a Xeon E3-1260L (2011), strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses BC7 Mode 6 only, for fast, high-quality block compression.  Note that actual encoding and decoding times will be much faster on newer CPUs.
 
 ### Encoding
 | | TexConv 4K | TexInspect 4K | Delta |
@@ -58,7 +58,38 @@ Kodak Lossless TrueColor Image Suite SSIM Benchmark (24 Images)
 | **Worst-Case** | 0.9862 | 0.9684 | 0.9427 | 0.9248 |
 > SSIM Reference: 1.0 = Lossless | >0.98 = Indistinguishable | >0.95 = Excellent | >0.90 = Acceptable
 
-## Usage Examples
+## CLI Usage
+```vbnet
+Usage: TexInspectCLI.exe <input_path> [options]
+
+Options:
+  -fmt <format>     Target Format (e.g., BC7_UNORM, DXT1, ATI2). Default: BC7_UNORM_SRGB
+  -m                Generate Mipmaps
+  -nx, --nodx10     Force legacy DDS header (Implicitly enabled for DXT/ATI formats, usually unneeded)
+  -o <path>         Output file or directory
+  -ext <extension>  Output extension for batch decoding (e.g., .jpg, .bmp). Default: .png
+  -r, --recursive   Search subdirectories when processing a folder
+  -f, --force       Suppress warnings and overwrite files
+  --info            Show header info for the target file(s) without processing
+
+Examples:
+  Encode PNG to BC3 DDS:
+    TexInspectCLI.exe texture.png -fmt BC3_UNORM_SRGB -m
+
+  Encode PNG to legacy DXT5 DDS:
+    TexInspectCLI.exe texture.png -fmt DXT5
+
+  Encode a folder of images to DDS into a specific output folder:
+    TexInspectCLI.exe "C:\InputImages" -o "C:\OutputDDS" -fmt BC7_UNORM_SRGB -m -f
+
+  Decode a folder of DDS files to JPEGs:
+    TexInspectCLI.exe "C:\InputDDS" -o "C:\OutputJPEGs" -ext .jpg -f
+
+  View header data of a specific file:
+    TexInspectCLI.exe texture.dds --info
+```
+
+## Class Usage
 ### Encoding
 ```vbnet
 'SourcePath, DXGI_Format, MipMaps, LegacySupport
