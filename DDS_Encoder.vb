@@ -40,7 +40,6 @@ Public Class DDS_Encoder
     Public ArraySize As Integer
     Public MiscFlags2 As DX10_MiscFlags2
 
-    Private SourcePath As String
     Private HasAlpha As Boolean
     Private HasMipMaps As Boolean
     Private HasCompression As Boolean
@@ -70,7 +69,6 @@ Public Class DDS_Encoder
     Public Sub New(Source As String, Format As DXGI_Format, MipMaps As Boolean, Optional LegacySupport As Boolean = False)
         ResourceDimension = DX10_ResourceDimension.D3D10_RESOURCE_DIMENSION_TEXTURE2D
         MiscFlag = DX10_MiscFlags.D3D10_RESOURCE_MISC_NONE
-        SourcePath = Source
         HasMipMaps = MipMaps
         DXGIFormat = Format
         RedBitMask = {0, 0, 0, 0}
@@ -89,37 +87,37 @@ Public Class DDS_Encoder
         End Using
         Dim DynamicAlpha As DX10_MiscFlags2 = If(HasAlpha, DX10_MiscFlags2.DDS_ALPHA_MODE_STRAIGHT, DX10_MiscFlags2.DDS_ALPHA_MODE_OPAQUE)
         Select Case Format
-            Case DXGI_Format.DXGI_FORMAT_BC1_UNORM
+            Case &H46, &H47, &H48 ' BC1 Typeless, UNORM, SRGB
                 HasCompression = True
                 CompressionMode = 1
                 BytesPerBlock = 8
                 FourCC = "DXT1"
                 MiscFlags2 = DynamicAlpha
-            Case DXGI_Format.DXGI_FORMAT_BC2_UNORM
+            Case &H49, &H4A, &H4B ' BC2 Typeless, UNORM, SRGB
                 HasCompression = True
                 CompressionMode = 2
                 BytesPerBlock = 16
                 FourCC = "DXT3"
                 MiscFlags2 = DynamicAlpha
-            Case DXGI_Format.DXGI_FORMAT_BC3_UNORM
+            Case &H4C, &H4D, &H4E ' BC3 Typeless, UNORM, SRGB
                 HasCompression = True
                 CompressionMode = 3
                 BytesPerBlock = 16
                 FourCC = "DXT5"
                 MiscFlags2 = DynamicAlpha
-            Case DXGI_Format.DXGI_FORMAT_BC4_UNORM
+            Case &H4F, &H50 ' BC4 Typeless, UNORM
                 HasCompression = True
                 CompressionMode = 4
                 BytesPerBlock = 8
                 FourCC = "ATI1"
                 MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_OPAQUE
-            Case DXGI_Format.DXGI_FORMAT_BC5_UNORM
+            Case &H52, &H53 ' BC5 Typeless, UNORM
                 HasCompression = True
                 CompressionMode = 5
                 BytesPerBlock = 16
                 FourCC = "ATI2"
                 MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_OPAQUE
-            Case DXGI_Format.DXGI_FORMAT_BC7_UNORM
+            Case &H61, &H62, &H63 ' BC7 Typeless, UNORM, SRGB
                 If LegacySupport Then
                     Throw New ArgumentException($"Invalid format: {Format.ToString()}.")
                 End If
@@ -127,7 +125,7 @@ Public Class DDS_Encoder
                 CompressionMode = 7
                 BytesPerBlock = 16
                 MiscFlags2 = DynamicAlpha
-            Case DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM
+            Case &H57, &H5A, &H5B ' B8G8R8A8 Typeless, UNORM, SRGB
                 HasCompression = False
                 CompressionMode = -1
                 BytesPerBlock = 4
@@ -140,7 +138,7 @@ Public Class DDS_Encoder
                     BlueBitMask = {&HFF, 0, 0, 0}
                     AlphaBitMask = {0, 0, 0, &HFF}
                 End If
-            Case DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM
+            Case &H58, &H5C, &H5D ' B8G8R8X8 Typeless, UNORM, SRGB
                 HasCompression = False
                 CompressionMode = -1
                 BytesPerBlock = 4

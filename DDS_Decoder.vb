@@ -26,10 +26,10 @@ Public Class DDS_Decoder
     Public FourCC As String
     Public RGBBitCount As Integer
 
-    Public RedBitMask As Integer
-    Public GreenBitMask As Integer
-    Public BlueBitMask As Integer
-    Public AlphaBitMask As Integer
+    Public RedBitMask As UInteger
+    Public GreenBitMask As UInteger
+    Public BlueBitMask As UInteger
+    Public AlphaBitMask As UInteger
 
     Public Caps1 As DDS_Caps1
     Public Caps2 As DDS_Caps2
@@ -73,10 +73,10 @@ Public Class DDS_Decoder
                 PixelFlags = Reader.ReadInt32()                         ' DDPIXELFORMAT dwFlags
                 FourCC = New String(Reader.ReadChars(4))                ' DDPIXELFORMAT dwFourCC
                 RGBBitCount = Reader.ReadInt32()                        ' DDPIXELFORMAT dwRGBBitCount
-                RedBitMask = Reader.ReadInt32()                         ' DDPIXELFORMAT dwRBitMask
-                GreenBitMask = Reader.ReadInt32()                       ' DDPIXELFORMAT dwGBitMask
-                BlueBitMask = Reader.ReadInt32()                        ' DDPIXELFORMAT dwBBitMask
-                AlphaBitMask = Reader.ReadInt32()                       ' DDPIXELFORMAT dwABitMask
+                RedBitMask = Reader.ReadUInt32()                         ' DDPIXELFORMAT dwRBitMask
+                GreenBitMask = Reader.ReadUInt32()                       ' DDPIXELFORMAT dwGBitMask
+                BlueBitMask = Reader.ReadUInt32()                        ' DDPIXELFORMAT dwBBitMask
+                AlphaBitMask = Reader.ReadUInt32()                       ' DDPIXELFORMAT dwABitMask
 
                 Caps1 = Reader.ReadInt32()                              ' dwCaps
                 Caps2 = Reader.ReadInt32()                              ' dwCaps2
@@ -893,10 +893,10 @@ Public Class DDS_Decoder
         Return {resB, resG, resR}
     End Function
 
-    Private Function GetShiftCount(Mask As Integer) As Integer
+    Private Function GetShiftCount(Mask As UInteger) As Integer
         If Mask = 0 Then Return 0
         Dim Shift As Integer = 0
-        Dim TempMask As UInteger = CUInt(Mask)
+        Dim TempMask As UInteger = Mask
         While (TempMask And 1UI) = 0
             TempMask >>= 1
             Shift += 1
