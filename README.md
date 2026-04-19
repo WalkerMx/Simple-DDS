@@ -1,19 +1,17 @@
 # TexInspect DDS Encoder/Decoder (VB.NET)
 A lightweight, fully managed DDS encoder and decoder. TexInspect is a zero-dependency application for handling 2D DirectDraw Surface textures.
 
-## TexInspect Features
+## Features
 * **Tiny Footprint:** Under 100Kb, portable even if you use floppy disks.
-* **Native Windows Compatibility:** Only requires .NET 4.7.2, no extra runtimes or redistributables.  Compatible with Windows 7 through 11.
-* **3D CubeMap Previews:** Full 3D previewing of CubeMaps with rotation.
-* **Robust Header Support:** Capable of reading and validating any DDS header, and reporting complete specifications.
-
-## Common Features
+* **Compatibility:** Only requires .NET 4.7.2, no extra runtimes or redistributables.  Compatible with Windows 7 through 11.
 * **Supported Modes:**
-    * **Encoding:** BC1 (DXT1), BC2 (DXT3), BC3 (DXT5), BC4 (ATI1), BC5 (ATI2), and BC7 (Lite).
+    * **Encoding:** BC1 (DXT1), BC2 (DXT3), BC3 (DXT5), BC4 (ATI1), BC5 (ATI2), and BC7 (Fast).
     * **Decoding:** BC1 (DXT1), BC2 (DXT3), BC3 (DXT5), BC4 (ATI1), BC5 (ATI2), and BC7 (Full).
 * **MipMaps:** Automated chain generation using box-filter downsampling.
 * **CubeMaps:** Automated decoding and saving of CubeMap arrays.
 * **Headers:** Supports Legacy FourCC and modern DX10 (DXGI_Format) extended headers.
+* **Reporting:** Capable of reading and validating DDS headers, and generating full reports.
+* **3D CubeMap Previews:** Full 3D previewing of CubeMaps with rotation (GUI Only).
 
 ## System Requirements
 ### Minimum
@@ -90,6 +88,7 @@ Examples:
 ```
 
 ## Class Usage
+If you would like to use TexInspect's engine, usage is simple.  Drop DDS_Common.vb, DDS_Encoder.vb, and/or DDS_Decoder.vb (or compile and add TexInspect.dll) into your project, and call it like this:
 ### Encoding
 ```vbnet
 'SourcePath, DXGI_Format, MipMaps, LegacySupport
