@@ -1,5 +1,11 @@
-# Simple DDS Encoder/Decoder (VB.NET)
-A lightweight, fully managed DDS encoder and decoder. Simple-DDS provides a zero-dependency solution for handling 2D DirectDraw Surface Textures in .NET, utilizing parallel processing for high performance.
+# TexInspect DDS Encoder/Decoder (VB.NET)
+A lightweight, fully managed DDS encoder and decoder. TexInspect is a zero-dependency application for handling 2D DirectDraw Surface textures.
+
+## TexInspect Features
+* **Tiny Footprint:** Under 100Kb, portable even if you use floppy disks.
+* **Native Windows Compatibility:** Only requires .NET 4.7.2, no extra runtimes or redistributables.  Compatible with Windows 7 through 11.
+* **3D CubeMap Previews:** Full 3D previewing of CubeMaps with rotation.
+* **Robust Header Support:** Capable of reading and validating any DDS header, and reporting complete specifications.
 
 ## Class Features
 * **Supported Modes:**
@@ -8,12 +14,6 @@ A lightweight, fully managed DDS encoder and decoder. Simple-DDS provides a zero
 * **MipMaps:** Automated chain generation using box-filter downsampling.
 * **CubeMaps:** Automated decoding and saving of CubeMap arrays.
 * **Headers:** Supports Legacy FourCC and modern DX10 (DXGI_Format) extended headers.
-
-## Demo App (TexInspect)
-* **Tiny Footprint:** Under 100Kb, portable even if you use Floppy Disks.
-* **Native Windows Compatibility:** Only requires .NET 4.7.2, no extra runtimes or redistributables.  Compatible with Windows 7 through 11.
-* **3D CubeMap Previews:** Full 3D previewing of CubeMaps with rotation.
-* **Robust Header Support:** Capable of reading and validating any DDS header, and reporting complete specifications.
 
 ## System Requirements
 ### Minimum
@@ -31,7 +31,7 @@ A lightweight, fully managed DDS encoder and decoder. Simple-DDS provides a zero
 > GPU requirements are recommended minimums for the OS.  Simple-DDS is GPU-agnostic.
 
 ## Performance
-Comparison testing was done on a Xeon E3-1260L, strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses BC7 Mode 6 only, for fast, high-quality block compression.
+Comparison testing was done on a Xeon E3-1260L (2011), strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses BC7 Mode 6 only, for fast, high-quality block compression.
 
 ### Encoding
 | | TexConv | Simple-DDS | Delta |
