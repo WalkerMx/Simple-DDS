@@ -34,7 +34,7 @@ A lightweight, fully managed DDS encoder and decoder. TexInspect is a zero-depen
 Comparison testing was done on a Xeon E3-1260L (2011), strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses BC7 Mode 6 only, for fast, high-quality block compression.
 
 ### Encoding
-| | TexConv | Simple-DDS | Delta |
+| | TexConv 4K | TexInspect 4K | Delta |
 | :--- | :--- | :--- | :--- |
 | BC1 No Mips | 663.34ms | 452.58ms | 1.5x Faster |
 | BC1 Full Mips | 1,229.55ms | 699.64ms | 1.8x Faster |
@@ -44,7 +44,7 @@ Comparison testing was done on a Xeon E3-1260L (2011), strictly on the CPU.  Res
 | BC7 (Mode 6) Full Mips | 102,513ms | 819.28ms | 125.1x Faster |
 
 ### Decoding
-| | TexConv | Simple-DDS | Delta |
+| | TexConv 4K | TexInspect 4K | Delta |
 | :--- | :--- | :--- | :--- |
 | BC1 to PNG | 2,105.18ms | 305.28ms | 6.9x Faster |
 | BC3 to PNG | 2,033.15ms | 380.66ms | 5.3x Faster |
@@ -52,7 +52,7 @@ Comparison testing was done on a Xeon E3-1260L (2011), strictly on the CPU.  Res
 
 ## Quality
 Kodak Lossless TrueColor Image Suite SSIM Benchmark (24 Images)
-| | TexConv BC7 | Simple-DDS BC7 | TexConv BC3 | Simple-DDS BC3 |
+| | TexConv BC7 | TexInspect BC7 | TexConv BC3 | TexInspect BC3 |
 | :--- | :--- | :--- | :--- | :--- |
 | **Average** | 0.9909 | 0.9858 | 0.9561 | 0.9454 |
 | **Worst-Case** | 0.9862 | 0.9684 | 0.9427 | 0.9248 |
