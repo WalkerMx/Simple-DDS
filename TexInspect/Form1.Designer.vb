@@ -39,12 +39,16 @@ Partial Class Form1
         Me.InfoTextBox = New System.Windows.Forms.TextBox()
         Me.LoadImageButton = New System.Windows.Forms.Button()
         Me.RightPanel = New System.Windows.Forms.Panel()
-        Me.Button1 = New System.Windows.Forms.Button()
+        Me.GroupBox1 = New System.Windows.Forms.GroupBox()
+        Me.CalcMetricsButton = New System.Windows.Forms.Button()
+        Me.DecBenchButton = New System.Windows.Forms.Button()
+        Me.EncBenchButton = New System.Windows.Forms.Button()
         Me.PreviewPictureBox = New System.Windows.Forms.PictureBox()
         Me.LeftPanel = New System.Windows.Forms.Panel()
         Me.DDSExportGroup.SuspendLayout()
         Me.ImageExportGroup.SuspendLayout()
         Me.RightPanel.SuspendLayout()
+        Me.GroupBox1.SuspendLayout()
         CType(Me.PreviewPictureBox, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.LeftPanel.SuspendLayout()
         Me.SuspendLayout()
@@ -52,7 +56,7 @@ Partial Class Form1
         'ExportDDSButton
         '
         Me.ExportDDSButton.Location = New System.Drawing.Point(6, 135)
-        Me.ExportDDSButton.Margin = New System.Windows.Forms.Padding(2, 2, 2, 2)
+        Me.ExportDDSButton.Margin = New System.Windows.Forms.Padding(2)
         Me.ExportDDSButton.Name = "ExportDDSButton"
         Me.ExportDDSButton.Size = New System.Drawing.Size(183, 34)
         Me.ExportDDSButton.TabIndex = 0
@@ -65,7 +69,7 @@ Partial Class Form1
         Me.CompressionCheckBox.Checked = True
         Me.CompressionCheckBox.CheckState = System.Windows.Forms.CheckState.Checked
         Me.CompressionCheckBox.Location = New System.Drawing.Point(6, 41)
-        Me.CompressionCheckBox.Margin = New System.Windows.Forms.Padding(2, 2, 2, 2)
+        Me.CompressionCheckBox.Margin = New System.Windows.Forms.Padding(2)
         Me.CompressionCheckBox.Name = "CompressionCheckBox"
         Me.CompressionCheckBox.Size = New System.Drawing.Size(86, 17)
         Me.CompressionCheckBox.TabIndex = 3
@@ -226,7 +230,7 @@ Partial Class Form1
         '
         'RightPanel
         '
-        Me.RightPanel.Controls.Add(Me.Button1)
+        Me.RightPanel.Controls.Add(Me.GroupBox1)
         Me.RightPanel.Controls.Add(Me.ImageExportGroup)
         Me.RightPanel.Controls.Add(Me.DDSExportGroup)
         Me.RightPanel.Dock = System.Windows.Forms.DockStyle.Right
@@ -235,14 +239,44 @@ Partial Class Form1
         Me.RightPanel.Size = New System.Drawing.Size(200, 400)
         Me.RightPanel.TabIndex = 0
         '
-        'Button1
+        'GroupBox1
         '
-        Me.Button1.Location = New System.Drawing.Point(3, 275)
-        Me.Button1.Name = "Button1"
-        Me.Button1.Size = New System.Drawing.Size(75, 23)
-        Me.Button1.TabIndex = 12
-        Me.Button1.Text = "Bench"
-        Me.Button1.UseVisualStyleBackColor = True
+        Me.GroupBox1.Controls.Add(Me.CalcMetricsButton)
+        Me.GroupBox1.Controls.Add(Me.DecBenchButton)
+        Me.GroupBox1.Controls.Add(Me.EncBenchButton)
+        Me.GroupBox1.Location = New System.Drawing.Point(3, 275)
+        Me.GroupBox1.Name = "GroupBox1"
+        Me.GroupBox1.Size = New System.Drawing.Size(194, 113)
+        Me.GroupBox1.TabIndex = 13
+        Me.GroupBox1.TabStop = False
+        Me.GroupBox1.Text = "Image Tests"
+        '
+        'CalcMetricsButton
+        '
+        Me.CalcMetricsButton.Location = New System.Drawing.Point(6, 77)
+        Me.CalcMetricsButton.Name = "CalcMetricsButton"
+        Me.CalcMetricsButton.Size = New System.Drawing.Size(182, 23)
+        Me.CalcMetricsButton.TabIndex = 14
+        Me.CalcMetricsButton.Text = "Quality Benchmark"
+        Me.CalcMetricsButton.UseVisualStyleBackColor = True
+        '
+        'DecBenchButton
+        '
+        Me.DecBenchButton.Location = New System.Drawing.Point(6, 48)
+        Me.DecBenchButton.Name = "DecBenchButton"
+        Me.DecBenchButton.Size = New System.Drawing.Size(182, 23)
+        Me.DecBenchButton.TabIndex = 13
+        Me.DecBenchButton.Text = "Decoding Benchmark"
+        Me.DecBenchButton.UseVisualStyleBackColor = True
+        '
+        'EncBenchButton
+        '
+        Me.EncBenchButton.Location = New System.Drawing.Point(6, 19)
+        Me.EncBenchButton.Name = "EncBenchButton"
+        Me.EncBenchButton.Size = New System.Drawing.Size(182, 23)
+        Me.EncBenchButton.TabIndex = 12
+        Me.EncBenchButton.Text = "Encoding Benchmark"
+        Me.EncBenchButton.UseVisualStyleBackColor = True
         '
         'PreviewPictureBox
         '
@@ -272,15 +306,16 @@ Partial Class Form1
         Me.Controls.Add(Me.PreviewPictureBox)
         Me.Controls.Add(Me.LeftPanel)
         Me.Controls.Add(Me.RightPanel)
-        Me.Margin = New System.Windows.Forms.Padding(2, 2, 2, 2)
+        Me.Margin = New System.Windows.Forms.Padding(2)
         Me.MinimumSize = New System.Drawing.Size(812, 427)
         Me.Name = "Form1"
-        Me.Text = "Tex Inspect"
+        Me.Text = "TexInspect"
         Me.DDSExportGroup.ResumeLayout(False)
         Me.DDSExportGroup.PerformLayout()
         Me.ImageExportGroup.ResumeLayout(False)
         Me.ImageExportGroup.PerformLayout()
         Me.RightPanel.ResumeLayout(False)
+        Me.GroupBox1.ResumeLayout(False)
         CType(Me.PreviewPictureBox, System.ComponentModel.ISupportInitialize).EndInit()
         Me.LeftPanel.ResumeLayout(False)
         Me.LeftPanel.PerformLayout()
@@ -307,5 +342,8 @@ Partial Class Form1
     Friend WithEvents PreviewPictureBox As PictureBox
     Friend WithEvents LeftPanel As Panel
     Friend WithEvents Label1 As Label
-    Friend WithEvents Button1 As Button
+    Friend WithEvents EncBenchButton As Button
+    Friend WithEvents GroupBox1 As GroupBox
+    Friend WithEvents CalcMetricsButton As Button
+    Friend WithEvents DecBenchButton As Button
 End Class

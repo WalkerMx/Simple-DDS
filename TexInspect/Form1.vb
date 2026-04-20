@@ -2,6 +2,7 @@
 Imports System.Text
 Imports System.Numerics
 Imports System.Drawing.Imaging
+Imports System.Net.Http.Headers
 
 Public Class Form1
 
@@ -139,38 +140,67 @@ Public Class Form1
         End Using
     End Sub
 
-    Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
+    Private Sub EncBenchButton_Click(sender As Object, e As EventArgs) Handles EncBenchButton.Click
         Dim BenchTime As Integer = 0
         Dim BenchTimer As Stopwatch
-        If MessageBox.Show("Encode?", "", MessageBoxButtons.YesNo) = DialogResult.Yes Then
-            Using OFD As New OpenFileDialog With {.Filter = "Image Files|*.png;*.jpg;*.bmp"}
+        Using OFD As New OpenFileDialog With {.Filter = "Image Files|*.png;*.jpg;*.bmp"}
+            If OFD.ShowDialog = DialogResult.OK Then
+                Dim targetFormat As DXGI_Format = GetFormatFromString(OverrideComboBox.SelectedItem.ToString())
+                Dim isLegacy As Boolean = Not ExtendedHeaderCheckBox.Checked
+                Dim doMipMaps As Boolean = MipMapCheckBox.Checked
+                BenchTimer = Stopwatch.StartNew
+                For i = 0 To 49
+                    Using Encoder As New DDS_Encoder(OFD.FileName, targetFormat, doMipMaps, isLegacy)
+                        Encoder.BeginEncode()
+                    End Using
+                Next
+                BenchTimer.Stop()
+                BenchTime = BenchTimer.ElapsedMilliseconds
+                MsgBox($"Average: {BenchTime / 50}")
+            End If
+        End Using
+    End Sub
+    Private Sub DecBenchButton_Click(sender As Object, e As EventArgs) Handles DecBenchButton.Click
+        Dim BenchTime As Integer = 0
+        Dim BenchTimer As Stopwatch
+        Using OFD As New OpenFileDialog With {.Filter = "Image Files|*.dds"}
+            If OFD.ShowDialog = DialogResult.OK Then
+                BenchTimer = Stopwatch.StartNew
+                For i = 0 To 49
+                    Using Decoder As New DDS_Decoder(OFD.FileName)
+                        Decoder.BeginDecode()
+                    End Using
+                Next
+                BenchTimer.Stop()
+                BenchTime = BenchTimer.ElapsedMilliseconds
+                MsgBox($"Average: {BenchTime / 50}")
+            End If
+        End Using
+    End Sub
+
+    Private Sub CalcMetricsButton_Click(sender As Object, e As EventArgs) Handles CalcMetricsButton.Click
+        If PreviewImage IsNot Nothing Then
+            Using OFD As New OpenFileDialog With {.Filter = "Image Files|*.png;*.jpg;*.bmp;*.dds"}
                 If OFD.ShowDialog = DialogResult.OK Then
-                    Dim targetFormat As DXGI_Format = GetFormatFromString(OverrideComboBox.SelectedItem.ToString())
-                    Dim isLegacy As Boolean = Not ExtendedHeaderCheckBox.Checked
-                    Dim doMipMaps As Boolean = MipMapCheckBox.Checked
-                    BenchTimer = Stopwatch.StartNew
-                    For i = 0 To 49
-                        Using Encoder As New DDS_Encoder(OFD.FileName, targetFormat, doMipMaps, isLegacy)
-                            Encoder.BeginEncode()
+                    Dim QualityReport As String = ""
+                    If Path.GetExtension(OFD.FileName).ToLower = ".dds" Then
+                        Using DDSDecoder As New DDS_Decoder(OFD.FileName)
+                            Using TempImage As Bitmap = DDSDecoder.ToBitmap
+                                Using QualityTest As New DDS_Metrics(PreviewImage, TempImage)
+                                    QualityTest.CalcAll()
+                                    QualityReport = $"MSE: {Math.Round(QualityTest.MSE.Average, 4)} | PSNR: {Math.Round(QualityTest.PSNR.Average, 4)} | SSIM: {Math.Round(QualityTest.SSIM.Average, 4)}"
+                                End Using
+                            End Using
                         End Using
-                    Next
-                    BenchTimer.Stop()
-                    BenchTime = BenchTimer.ElapsedMilliseconds
-                    MsgBox($"Average: {BenchTime / 50}")
-                End If
-            End Using
-        Else
-            Using OFD As New OpenFileDialog With {.Filter = "Image Files|*.dds"}
-                If OFD.ShowDialog = DialogResult.OK Then
-                    BenchTimer = Stopwatch.StartNew
-                    For i = 0 To 49
-                        Using Decoder As New DDS_Decoder(OFD.FileName)
-                            Decoder.BeginDecode()
+                    Else
+                        Using TempImage As Bitmap = Image.FromFile(OFD.FileName)
+                            Using QualityTest As New DDS_Metrics(PreviewImage, TempImage)
+                                QualityTest.CalcAll()
+                                QualityReport = $"MSE: {Math.Round(QualityTest.MSE.Average, 4)} | PSNR: {Math.Round(QualityTest.PSNR.Average, 4)} | SSIM: {Math.Round(QualityTest.SSIM.Average, 4)}"
+                            End Using
                         End Using
-                    Next
-                    BenchTimer.Stop()
-                    BenchTime = BenchTimer.ElapsedMilliseconds
-                    MsgBox($"Average: {BenchTime / 50}")
+                    End If
+                    MessageBox.Show(QualityReport, "Report", MessageBoxButtons.OK, MessageBoxIcon.Information)
                 End If
             End Using
         End If
