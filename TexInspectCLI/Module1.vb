@@ -15,6 +15,8 @@ Public Module Module1
         Public ForceOverwrite As Boolean = False
         Public RecursiveSearch As Boolean = False
         Public TargetImgExt As String = ".png"
+        Public ReferencePath As String = ""
+        Public Verbose As Boolean = False
     End Class
 
     Private ReadOnly ImgExts As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {".png", ".jpg", ".jpeg", ".bmp", ".tga"}
@@ -44,14 +46,14 @@ Public Module Module1
                 Select Case args(i).ToLower()
                     Case "-f", "--force"
                         CliOpts.ForceOverwrite = True
-                    Case "-fmt"
+                    Case "-fmt", "--format"
                         CliOpts.Format = GetFormatFromString(args(i + 1))
                         i += 1
-                    Case "-m"
+                    Case "-m", "--mipmaps"
                         CliOpts.GenerateMips = True
                     Case "-nx", "--nodx10"
                         CliOpts.UseLegacyHeader = True
-                    Case "-o"
+                    Case "-o", "--output"
                         CliOpts.OutputPath = args(i + 1)
                         i += 1
                     Case "-r", "--recursive"
@@ -62,14 +64,47 @@ Public Module Module1
                             If Not CliOpts.TargetImgExt.StartsWith(".") Then CliOpts.TargetImgExt = "." & CliOpts.TargetImgExt
                             i += 1
                         End If
-                    Case "--info"
+                    Case "-inf", "--info"
                         CliOpts.ShowInfo = True
+                    Case "-q", "--quality"
+                        If i + 1 < args.Length Then
+                            CliOpts.ReferencePath = args(i + 1)
+                            i += 1
+                        End If
+                    Case "-qv", "--qualityverbose"
+                        CliOpts.Verbose = True
+                        If i + 1 < args.Length Then
+                            CliOpts.ReferencePath = args(i + 1)
+                            i += 1
+                        End If
                     Case Else
                         If Not args(i).StartsWith("-") Then CliOpts.InputPath = args(i)
                 End Select
                 i += 1
             End While
             If LegacyFormats.Contains(CliOpts.Format) Then CliOpts.UseLegacyHeader = True
+            If CliOpts.Verbose = True OrElse CliOpts.ReferencePath <> "" Then
+                If String.IsNullOrWhiteSpace(CliOpts.ReferencePath) Then
+                    Console.WriteLine("Error: Missing reference path.")
+                    Return
+                End If
+                Dim InputIsFile As Boolean = File.Exists(CliOpts.InputPath)
+                Dim InputIsDir As Boolean = Directory.Exists(CliOpts.InputPath)
+                Dim RefIsFile As Boolean = File.Exists(CliOpts.ReferencePath)
+                Dim RefIsDir As Boolean = Directory.Exists(CliOpts.ReferencePath)
+                If (InputIsFile AndAlso Not RefIsFile) OrElse (InputIsDir AndAlso Not RefIsDir) Then
+                    Console.WriteLine("Error: Type mismatch. Both paths must be either both be files, or directories.")
+                    Return
+                End If
+                If InputIsDir Then
+                    HandleQualityBatch(CliOpts)
+                ElseIf InputIsFile Then
+                    RunQualityMetrics(CliOpts.InputPath, CliOpts.ReferencePath, CliOpts)
+                Else
+                    Console.WriteLine($"Error: Input path '{CliOpts.InputPath}' not found.")
+                End If
+                Return
+            End If
             If Directory.Exists(CliOpts.InputPath) Then
                 HandleBatch(CliOpts)
             ElseIf File.Exists(CliOpts.InputPath) Then
@@ -106,6 +141,67 @@ Public Module Module1
             RunProcessor(File, FilePath, CliOpts)
         Next
     End Sub
+
+    Private Sub HandleQualityBatch(CliOpts As CliOptions)
+        Dim SearchOpts = If(CliOpts.RecursiveSearch, SearchOption.AllDirectories, SearchOption.TopDirectoryOnly)
+        Dim FileList = Directory.EnumerateFiles(CliOpts.InputPath, "*.*", SearchOpts)
+        For Each FilePath As String In FileList
+            Dim FileExt = Path.GetExtension(FilePath)
+            If Not (ImgExts.Contains(FileExt) OrElse DdsExts.Contains(FileExt)) Then Continue For
+            Dim RelPath As String = FilePath.Substring(CliOpts.InputPath.Length).TrimStart(Path.DirectorySeparatorChar)
+            Dim RelDir As String = Path.GetDirectoryName(RelPath)
+            Dim BaseName As String = Path.GetFileNameWithoutExtension(FilePath)
+            Dim TargetRefDir As String = Path.Combine(CliOpts.ReferencePath, RelDir)
+            Dim RefFile As String = ""
+            If Directory.Exists(TargetRefDir) Then
+                Dim PossibleMatches = Directory.GetFiles(TargetRefDir, BaseName & ".*")
+                For Each Match In PossibleMatches
+                    Dim MatchExt = Path.GetExtension(Match)
+                    If ImgExts.Contains(MatchExt) OrElse DdsExts.Contains(MatchExt) Then
+                        RefFile = Match
+                        Exit For
+                    End If
+                Next
+            End If
+            If RefFile <> "" AndAlso File.Exists(RefFile) Then
+                RunQualityMetrics(FilePath, RefFile, CliOpts)
+            Else
+                Console.WriteLine($"[SKIPPED] {RelPath}: Matching reference file not found in target directory.")
+            End If
+        Next
+    End Sub
+
+    Private Sub RunQualityMetrics(Source As String, Reference As String, CliOpts As CliOptions)
+        Try
+            Using BmpSource As Bitmap = LoadBitmapForMetrics(Source)
+                Using BmpReference As Bitmap = LoadBitmapForMetrics(Reference)
+                    Using Metrics As New DDS_Metrics(BmpSource, BmpReference)
+                        Metrics.CalcAll()
+                        Console.WriteLine($"{Path.GetFileName(Source)} <-> {Path.GetFileName(Reference)} | MSE: {Metrics.MSE.Average:F4} | PSNR: {Metrics.PSNR.Average:F4} dB | SSIM: {Metrics.SSIM.Average:F4}")
+                        If CliOpts.Verbose Then
+                            Console.WriteLine("[Per-Channel (R, G, B, A)]")
+                            Console.WriteLine($"MSE:  R:{Metrics.MSE.R:F4}  G:{Metrics.MSE.G:F4}  B:{Metrics.MSE.B:F4}  A:{Metrics.MSE.A:F4}")
+                            Console.WriteLine($"PSNR: R:{Metrics.PSNR.R:F4} dB  G:{Metrics.PSNR.G:F4} dB  B:{Metrics.PSNR.B:F4} dB  A:{Metrics.PSNR.A:F4} dB")
+                            Console.WriteLine($"SSIM: R:{Metrics.SSIM.R:F4}  G:{Metrics.SSIM.G:F4}  B:{Metrics.SSIM.B:F4}  A:{Metrics.SSIM.A:F4}")
+                            Console.WriteLine()
+                        End If
+                    End Using
+                End Using
+            End Using
+        Catch ex As Exception
+            Console.WriteLine($"[FAILED]: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Function LoadBitmapForMetrics(FilePath As String) As Bitmap
+        If Path.GetExtension(FilePath).ToLower() = ".dds" Then
+            Using DDSDecoder As New DDS_Decoder(FilePath)
+                Return DDSDecoder.ToBitmap()
+            End Using
+        Else
+            Return New Bitmap(FilePath)
+        End If
+    End Function
 
     Private Sub RunProcessor(Source As String, Target As String, CliOpts As CliOptions)
         Try
@@ -251,18 +347,20 @@ Public Module Module1
     End Function
 
     Private Sub DisplayHelp()
-        Console.WriteLine("TexInspectCLI v1.0.0")
+        Console.WriteLine("TexInspectCLI v1.1.0")
         Console.WriteLine("Usage: TexInspectCLI.exe <input_path> [options]")
         Console.WriteLine()
         Console.WriteLine("Options:")
-        Console.WriteLine("  -fmt <format>     Target Format (e.g., BC7_UNORM, DXT1, ATI2). Default: BC7_UNORM_SRGB")
-        Console.WriteLine("  -m                Generate Mipmaps")
-        Console.WriteLine("  -nx, --nodx10     Force legacy DDS header (Implicitly enabled for DXT/ATI formats)")
-        Console.WriteLine("  -o <path>         Output file or directory")
-        Console.WriteLine("  -ext <extension>  Output extension for batch decoding (e.g., .jpg, .bmp). Default: .png")
-        Console.WriteLine("  -r, --recursive   Search subdirectories when processing a folder")
-        Console.WriteLine("  -f, --force       Suppress warnings and overwrite files")
-        Console.WriteLine("  --info            Show header info for the target file(s) without processing")
+        Console.WriteLine("  -fmt <format>                  Target Format (e.g., BC7_UNORM, DXT1, ATI2). Default: BC7_UNORM_SRGB")
+        Console.WriteLine("  -m                             Generate Mipmaps")
+        Console.WriteLine("  -nx, --nodx10                  Force legacy DDS header (Implicitly enabled for DXT/ATI formats)")
+        Console.WriteLine("  -o <path>                      Output file or directory")
+        Console.WriteLine("  -ext <extension>               Output extension for batch decoding (e.g., .jpg, .bmp). Default: .png")
+        Console.WriteLine("  -r, --recursive                Search subdirectories when processing a folder")
+        Console.WriteLine("  -f, --force                    Suppress warnings and overwrite files")
+        Console.WriteLine("  --info                         Show header info for the target file(s) without processing")
+        Console.WriteLine("  -q, --quality <path>           Compare input to reference path and print average MSE, PSNR, & SSIM")
+        Console.WriteLine("  -qv, --qualityverbose <path>   Compare input to reference path and print average & per-channel metrics")
         Console.WriteLine()
         Console.WriteLine("Examples:")
         Console.WriteLine("  Encode PNG to BC7 DDS:")
@@ -274,7 +372,9 @@ Public Module Module1
         Console.WriteLine("  Decode a folder of DDS files to JPEGs:")
         Console.WriteLine("    TexInspectCLI.exe ""C:\InputDDS"" -o ""C:\OutputJPEGs"" -ext .jpg -f" & vbCrLf)
         Console.WriteLine("  View header data of a specific file:")
-        Console.WriteLine("    TexInspectCLI.exe texture.dds --info")
+        Console.WriteLine("    TexInspectCLI.exe texture.dds --info" & vbCrLf)
+        Console.WriteLine("  Generate quality metrics between two files:")
+        Console.WriteLine("    TexInspectCLI.exe texture.dds -q texture.png")
     End Sub
 
 End Module
