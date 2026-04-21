@@ -11,6 +11,7 @@ A lightweight, fully managed DDS encoder and decoder. TexInspect is a zero-depen
     * **Decoding:** BC1 (DXT1), BC2 (DXT3), BC3 (DXT5), BC4 (ATI1), BC5 (ATI2), and BC7 (Full).
 * **MipMaps:** Automated chain generation using box-filter downsampling.
 * **CubeMaps:** Automated decoding and saving of CubeMap arrays.
+* **Quality Analysis:** Supports assessing MSE, PSNR, and SSIM.
 * **Headers:** Supports Legacy FourCC and modern DX10 (DXGI_Format) extended headers.
 * **Reporting:** Capable of reading and validating DDS headers, and generating full reports.
 * **3D CubeMap Previews:** Full 3D previewing of CubeMaps with rotation (GUI Only).
@@ -59,22 +60,24 @@ Kodak Lossless TrueColor Image Suite SSIM Benchmark (24 Images)
 > SSIM Reference: 1.0 = Lossless | >0.98 = Indistinguishable | >0.95 = Excellent | >0.90 = Acceptable
 
 ## CLI Usage
-```vbnet
+```
 Usage: TexInspectCLI.exe <input_path> [options]
 
 Options:
-  -fmt <format>     Target Format (e.g., BC7_UNORM, DXT1, ATI2). Default: BC7_UNORM_SRGB
-  -m                Generate Mipmaps
-  -nx, --nodx10     Force legacy DDS header (Implicitly enabled for DXT/ATI formats, usually unneeded)
-  -o <path>         Output file or directory
-  -ext <extension>  Output extension for batch decoding (e.g., .jpg, .bmp). Default: .png
-  -r, --recursive   Search subdirectories when processing a folder
-  -f, --force       Suppress warnings and overwrite files
-  --info            Show header info for the target file(s) without processing
+  -fmt <format>                  Target Format (e.g., BC7_UNORM, DXT1, ATI2). Default: BC7_UNORM_SRGB
+  -m                             Generate Mipmaps
+  -nx, --nodx10                  Force legacy DDS header (Implicitly enabled for DXT/ATI formats)
+  -o <path>                      Output file or directory
+  -ext <extension>               Output extension for batch decoding (e.g., .jpg, .bmp). Default: .png
+  -r, --recursive                Search subdirectories when processing a folder
+  -f, --force                    Suppress warnings and overwrite files
+  --info                         Show header info for the target file(s) without processing
+  -q, --quality <path>           Compare input to reference path and print average MSE, PSNR, & SSIM
+  -qv, --qualityverbose <path>   Compare input to reference path and print average & per-channel metrics
 
 Examples:
-  Encode PNG to BC3 DDS:
-    TexInspectCLI.exe texture.png -fmt BC3_UNORM_SRGB -m
+  Encode PNG to BC7 DDS:
+    TexInspectCLI.exe texture.png -fmt BC7_UNORM_SRGB -m
 
   Encode PNG to legacy DXT5 DDS:
     TexInspectCLI.exe texture.png -fmt DXT5
@@ -87,6 +90,9 @@ Examples:
 
   View header data of a specific file:
     TexInspectCLI.exe texture.dds --info
+
+  Generate quality metrics between two files:
+    TexInspectCLI.exe texture.dds -q texture.png
 ```
 
 ## Class Usage
