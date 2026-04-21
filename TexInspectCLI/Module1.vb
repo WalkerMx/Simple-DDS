@@ -48,6 +48,7 @@ Public Module Module1
                         CliOpts.ForceOverwrite = True
                     Case "-fmt", "--format"
                         CliOpts.Format = GetFormatFromString(args(i + 1))
+                        If LegacyFormats.Contains(args(i + 1)) Then CliOpts.UseLegacyHeader = True
                         i += 1
                     Case "-m", "--mipmaps"
                         CliOpts.GenerateMips = True
@@ -82,7 +83,6 @@ Public Module Module1
                 End Select
                 i += 1
             End While
-            If LegacyFormats.Contains(CliOpts.Format) Then CliOpts.UseLegacyHeader = True
             If CliOpts.Verbose = True OrElse CliOpts.ReferencePath <> "" Then
                 If String.IsNullOrWhiteSpace(CliOpts.ReferencePath) Then
                     Console.WriteLine("Error: Missing reference path.")
@@ -179,10 +179,10 @@ Public Module Module1
                         Metrics.CalcAll()
                         Console.WriteLine($"{Path.GetFileName(Source)} <-> {Path.GetFileName(Reference)} | MSE: {Metrics.MSE.Average:F4} | PSNR: {Metrics.PSNR.Average:F4} dB | SSIM: {Metrics.SSIM.Average:F4}")
                         If CliOpts.Verbose Then
-                            Console.WriteLine("[Per-Channel (R, G, B, A)]")
-                            Console.WriteLine($"MSE:  R:{Metrics.MSE.R:F4}  G:{Metrics.MSE.G:F4}  B:{Metrics.MSE.B:F4}  A:{Metrics.MSE.A:F4}")
-                            Console.WriteLine($"PSNR: R:{Metrics.PSNR.R:F4} dB  G:{Metrics.PSNR.G:F4} dB  B:{Metrics.PSNR.B:F4} dB  A:{Metrics.PSNR.A:F4} dB")
-                            Console.WriteLine($"SSIM: R:{Metrics.SSIM.R:F4}  G:{Metrics.SSIM.G:F4}  B:{Metrics.SSIM.B:F4}  A:{Metrics.SSIM.A:F4}")
+                            Console.WriteLine($"    Red |  MSE:{Metrics.MSE.R:F4} | PSNR:{Metrics.PSNR.R:F4} dB | SSIM:{Metrics.SSIM.R:F4}")
+                            Console.WriteLine($"    Green | MSE:{Metrics.MSE.G:F4} | PSNR:{Metrics.PSNR.G:F4} dB | SSIM:{Metrics.SSIM.G:F4}")
+                            Console.WriteLine($"    Blue |  MSE:{Metrics.MSE.B:F4} | PSNR:{Metrics.PSNR.B:F4} dB | SSIM:{Metrics.SSIM.B:F4}")
+                            Console.WriteLine($"    Alpha |  MSE:{Metrics.MSE.A:F4} | PSNR:{Metrics.PSNR.A:F4} dB | SSIM:{Metrics.SSIM.A:F4}")
                             Console.WriteLine()
                         End If
                     End Using
