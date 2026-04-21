@@ -1,7 +1,7 @@
 # TexInspect DDS Encoder/Decoder (VB.NET)
 A lightweight, fully managed DDS encoder and decoder. TexInspect is a zero-dependency application for handling 2D DirectDraw Surface textures.
 
-![](https://raw.githubusercontent.com/WalkerMx/DemoImages/refs/heads/master/TexInspect/preview.png)
+![](https://raw.githubusercontent.com/WalkerMx/DemoImages/refs/heads/master/TexInspect/TexInspectSS.png)
 
 ## Features
 * **Tiny Footprint:** Under 100Kb, portable even if you use floppy disks.
