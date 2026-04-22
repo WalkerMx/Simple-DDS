@@ -119,6 +119,8 @@ Public Module DDS_Common
         DDS_ALPHA_MODE_CUSTOM = &H4
     End Enum
 
+    Public ReadOnly CubeSuffixes As String() = {"_PX", "_NX", "_PY", "_NY", "_PZ", "_NZ"}
+
     Public ReadOnly Weight2() As Integer = {0, 21, 43, 64}
     Public ReadOnly Weight3() As Integer = {0, 9, 18, 27, 37, 46, 55, 64}
     Public ReadOnly Weight4() As Integer = {0, 4, 9, 13, 17, 21, 26, 30, 34, 38, 43, 47, 51, 55, 60, 64}

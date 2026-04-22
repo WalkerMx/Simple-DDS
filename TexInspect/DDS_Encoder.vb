@@ -4,6 +4,7 @@
 ' https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds
 
 Imports System.IO
+Imports System.Drawing
 Imports System.Drawing.Imaging
 Imports System.Runtime.InteropServices
 
@@ -48,6 +49,8 @@ Public Class DDS_Encoder
     Private MipCount As Integer
     Private BytesPerBlock As Integer
     Private CompressionMode As Integer
+
+    Private CubeFaces As String()
 
     Private HeaderBytes As Byte()
     Private WorkingBytes As Byte()
@@ -185,6 +188,34 @@ Public Class DDS_Encoder
         WriteHeader()
     End Sub
 
+    ''' <summary>
+    ''' Creates a DDS CubeMap by explicitly defining the target DXGI Format.
+    ''' Expected face order in the Sources array: +X (Right), -X (Left), +Y (Top), -Y (Bottom), +Z (Front), -Z (Back).
+    ''' </summary>
+    ''' <param name="Sources">Array of 6 image paths corresponding to the cubemap faces.</param>
+    ''' <param name="Format">The explicit DXGI format to encode to.</param>
+    ''' <param name="MipMaps">Create mipmaps for distant objects.</param>
+    ''' <param name="LegacySupport">If true, strips the DX10 header and uses standard FourCC/Bitmasks. Throws an exception if the format requires DX10.</param>
+    Public Sub New(Sources As String(), Format As DXGI_Format, MipMaps As Boolean, Optional LegacySupport As Boolean = False)
+        Me.New(Sources(0), Format, MipMaps, LegacySupport)
+        If Sources.Length <> 6 Then
+            Throw New ArgumentException("A cubemap requires exactly 6 image faces.")
+        End If
+        CubeFaces = Sources
+        Caps1 = Caps1 Or DDS_Caps1.DDSCAPS_COMPLEX
+        Caps2 = Caps2 Or DDS_Caps2.DDSCAPS2_CUBEMAP
+        Caps2 = Caps2 Or DDS_Caps2.DDSCAPS2_CUBEMAP_POSITIVEX
+        Caps2 = Caps2 Or DDS_Caps2.DDSCAPS2_CUBEMAP_NEGATIVEX
+        Caps2 = Caps2 Or DDS_Caps2.DDSCAPS2_CUBEMAP_POSITIVEY
+        Caps2 = Caps2 Or DDS_Caps2.DDSCAPS2_CUBEMAP_NEGATIVEY
+        Caps2 = Caps2 Or DDS_Caps2.DDSCAPS2_CUBEMAP_POSITIVEZ
+        Caps2 = Caps2 Or DDS_Caps2.DDSCAPS2_CUBEMAP_NEGATIVEZ
+        If HasExtendedHeader Then
+            MiscFlag = DX10_MiscFlags.D3D10_RESOURCE_MISC_TEXTURECUBE
+        End If
+        WriteHeader()
+    End Sub
+
     Private Sub WriteHeader()
 
         Using HeaderStream As New MemoryStream()
@@ -210,7 +241,7 @@ Public Class DDS_Encoder
             HeaderStream.Write(AlphaBitMask, 0, 4)                          ' DDPIXELFORMAT dwABitMask
 
             HeaderStream.Write(OrderBytes(Caps1), 0, 4)                     ' dwCaps1
-            HeaderStream.Write(OrderBytes(0), 0, 4)                         ' dwCaps2
+            HeaderStream.Write(OrderBytes(Caps2), 0, 4)                     ' dwCaps2
 
             HeaderStream.Write(New Byte(11) {}, 0, 12)                      ' dwCaps3, dwCaps4, dwReserved2
 
@@ -244,6 +275,39 @@ Public Class DDS_Encoder
                     PayloadStream.Write(NextBytes, 0, NextBytes.Count)
                 Next
             End If
+            WorkingBytes = Nothing
+            PayloadBytes = PayloadStream.ToArray
+        End Using
+    End Sub
+
+    Public Sub BeginEncodeCube()
+        Using PayloadStream As New MemoryStream()
+            PayloadStream.Write(HeaderBytes, 0, HeaderBytes.Length)
+            For faceIndex As Integer = 0 To 5
+                Dim TempWidth As Integer = Me.Width
+                Dim TempHeight As Integer = Me.Height
+                Using TempBitmap As Bitmap = Image.FromFile(CubeFaces(faceIndex))
+                    If TempBitmap.Width <> Me.Width OrElse TempBitmap.Height <> Me.Height Then
+                        Throw New InvalidDataException($"Dimensions of face {faceIndex} do not match the base (+X) image.")
+                    End If
+                    Dim SourceRect As New Rectangle(0, 0, TempBitmap.Width, TempBitmap.Height)
+                    Dim SourceData As BitmapData = TempBitmap.LockBits(SourceRect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb)
+                    WorkingBytes = New Byte(SourceData.Stride * TempBitmap.Height - 1) {}
+                    Marshal.Copy(SourceData.Scan0, WorkingBytes, 0, WorkingBytes.Length)
+                    TempBitmap.UnlockBits(SourceData)
+                End Using
+                Dim NextBytes As Byte() = GetImageData(WorkingBytes, TempWidth, TempHeight)
+                PayloadStream.Write(NextBytes, 0, NextBytes.Length)
+                If HasMipMaps Then
+                    For i As Integer = 0 To MipCount - 2
+                        WorkingBytes = HalveArray(WorkingBytes, TempWidth, TempHeight)
+                        TempWidth = Math.Max(1, TempWidth >> 1)
+                        TempHeight = Math.Max(1, TempHeight >> 1)
+                        NextBytes = GetImageData(WorkingBytes, TempWidth, TempHeight)
+                        PayloadStream.Write(NextBytes, 0, NextBytes.Length)
+                    Next
+                End If
+            Next
             WorkingBytes = Nothing
             PayloadBytes = PayloadStream.ToArray
         End Using
@@ -577,7 +641,11 @@ Public Class DDS_Encoder
     End Sub
 
     Public Sub Save(FilePath As String)
-        BeginEncode()
+        If CubeFaces IsNot Nothing Then
+            BeginEncodeCube()
+        Else
+            BeginEncode()
+        End If
         File.WriteAllBytes(FilePath, PayloadBytes)
     End Sub
 
@@ -625,7 +693,7 @@ Public Class DDS_Encoder
     Private Function OrderBytes(Source As String) As Byte()
         Dim Bytes(3) As Byte
         If Not String.IsNullOrEmpty(Source) Then
-            Dim Temp As Byte() = Text.Encoding.ASCII.GetBytes(Source)
+            Dim Temp As Byte() = System.Text.Encoding.ASCII.GetBytes(Source)
             Array.Copy(Temp, Bytes, Math.Min(Temp.Length, 4))
         End If
         Return Bytes
@@ -633,6 +701,7 @@ Public Class DDS_Encoder
 
     Protected Overridable Sub Dispose(Disposing As Boolean)
         If Not Disposed Then
+            CubeFaces = Nothing
             HeaderBytes = Nothing
             PayloadBytes = Nothing
         End If

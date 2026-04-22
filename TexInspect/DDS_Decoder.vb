@@ -846,16 +846,16 @@ Public Class DDS_Decoder
         Return TempImage
     End Function
 
-    Public Sub SaveCubeMaps(BaseFilePath As String)
+    Public Sub SaveCubeMaps(Path As String, Format As ImageFormat)
         DecodeCubeMap()
-        Dim suffixes() As String = {"_PX", "_NX", "_PY", "_NY", "_PZ", "_NZ"}
         For i As Integer = 0 To 5
             If CubeFaces(i) IsNot Nothing Then
                 Using bmp As New Bitmap(Me.Width, Me.Height, PixelFormat.Format32bppArgb)
+                    Dim Ext As String = GetExtFromImageFormat(Format)
                     Dim bmpData As BitmapData = bmp.LockBits(New Rectangle(0, 0, Me.Width, Me.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb)
                     Marshal.Copy(CubeFaces(i), 0, bmpData.Scan0, CubeFaces(i).Count)
                     bmp.UnlockBits(bmpData)
-                    bmp.Save(BaseFilePath & suffixes(i) & ".png", ImageFormat.Png)
+                    bmp.Save($"{Path.Replace(Ext, "")}{CubeSuffixes(i)}{Ext}", Format)
                 End Using
             End If
         Next
@@ -903,6 +903,13 @@ Public Class DDS_Decoder
             If Shift > 32 Then Return 0
         End While
         Return Shift
+    End Function
+
+    Private Function GetExtFromImageFormat(Format As ImageFormat) As String
+        If Format Is ImageFormat.Png Then Return ".png"
+        If Format Is ImageFormat.Jpeg Then Return ".jpg"
+        If Format Is ImageFormat.Bmp Then Return ".bmp"
+        Return ""
     End Function
 
     Private Function GetFileBytes(Source As String, Offset As Long, Count As Integer) As Byte()
