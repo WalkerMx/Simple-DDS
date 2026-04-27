@@ -19,7 +19,7 @@ A lightweight, fully managed DDS encoder and decoder. TexInspect is a zero-depen
 ## System Requirements
 ### Minimum
 * **Operating System:** Windows 7 SP1 (x86) with .NET Framework 4.7.2
-* **Processor:** Dual-Core CPU (e.g., Intel Pentium G-series / Core2 Duo)
+* **Processor:** Dual-Core CPU (e.g., AMD Athlon 64 X2 / Intel Core2 Duo)
 * **Memory:** 2 GB RAM
 * **Storage:** >128 KB available space
 * **Graphics:** Integrated Graphics or any DirectX 9.0c compatible GPU with 128MB of VRAM
