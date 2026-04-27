@@ -3,9 +3,10 @@
 ' http://doc.51windows.net/directx9_sdk/graphics/reference/DDSFileReference/ddsfileformat.htm
 ' https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds
 
-Imports System.IO
 Imports System.Drawing
 Imports System.Drawing.Imaging
+Imports System.IO
+Imports System.Runtime.CompilerServices
 Imports System.Runtime.InteropServices
 
 Public Class DDS_Encoder
@@ -405,57 +406,70 @@ Public Class DDS_Encoder
                 idx += 1
             Next
         Next
-        Dim R0 As Integer = MinR >> 1, R1 As Integer = MaxR >> 1
-        Dim G0 As Integer = MinG >> 1, G1 As Integer = MaxG >> 1
-        Dim B0 As Integer = MinB >> 1, B1 As Integer = MaxB >> 1
-        Dim A0 As Integer = MinA >> 1, A1 As Integer = MaxA >> 1
-        Dim MinLum As Integer = MinB + (MinG << 1) + MinR + MinA
-        Dim MaxLum As Integer = MaxB + (MaxG << 1) + MaxR + MaxA
-        Dim Range As Single = If(MaxLum - MinLum < 1, 1.0F, CSng(MaxLum - MinLum))
-        For i As Integer = 0 To 15
-            Dim PixB As Integer = LocalB(i)
-            Dim PixG As Integer = LocalG(i)
-            Dim PixR As Integer = LocalR(i)
-            Dim PixA As Integer = LocalA(i)
-            Dim PixLum As Integer = PixB + (PixG << 1) + PixR + PixA
-            Dim Index As Integer = CInt(((PixLum - MinLum) / Range) * 15.0F)
-            If Index > 15 Then Index = 15
-            If Index < 0 Then Index = 0
-            ColorTable(i) = CULng(Index)
-        Next
-        If ColorTable(0) >= 8UL Then
-            Dim Temp As Integer
-            Temp = R0 : R0 = R1 : R1 = Temp
-            Temp = G0 : G0 = G1 : G1 = Temp
-            Temp = B0 : B0 = B1 : B1 = Temp
-            Temp = A0 : A0 = A1 : A1 = Temp
-            For i As Integer = 0 To 15
-                ColorTable(i) = 15UL - ColorTable(i)
+        Dim threshold As Integer = 48
+        Dim maxDist As Integer = 0
+        Dim aIdx As Integer = 0, bIdx As Integer = 0
+        Dim corners() As Integer = {0, 3, 12, 15}
+        Dim dR, dG, dB, mask As Integer
+        For i = 0 To 2
+            For j = i + 1 To 3
+                Dim c1 = corners(i)
+                Dim c2 = corners(j)
+                dR = LocalR(c1) - LocalR(c2) : mask = dR >> 31 : dR = (dR + mask) Xor mask
+                dG = LocalG(c1) - LocalG(c2) : mask = dG >> 31 : dG = (dG + mask) Xor mask
+                dB = LocalB(c1) - LocalB(c2) : mask = dB >> 31 : dB = (dB + mask) Xor mask
+                Dim dist As Integer = dR + dG + dB
+                If dist > maxDist Then
+                    maxDist = dist
+                    aIdx = c1
+                    bIdx = c2
+                End If
             Next
+        Next
+        Dim useMode1 As Boolean = False
+        Dim useMode7 As Boolean = False
+        Dim bestPartition As Integer = -1
+        If maxDist >= threshold Then
+            Dim aR = LocalR(aIdx), aG = LocalG(aIdx), aB = LocalB(aIdx)
+            Dim bR = LocalR(bIdx), bG = LocalG(bIdx), bB = LocalB(bIdx)
+            Dim cornerTarget(3) As Integer
+            For c As Integer = 0 To 3
+                Dim cIdx = corners(c)
+                dR = LocalR(cIdx) - aR : mask = dR >> 31 : dR = (dR + mask) Xor mask
+                dG = LocalG(cIdx) - aG : mask = dG >> 31 : dG = (dG + mask) Xor mask
+                dB = LocalB(cIdx) - aB : mask = dB >> 31 : dB = (dB + mask) Xor mask
+                Dim dA_dist As Integer = dR + dG + dB
+                dR = LocalR(cIdx) - bR : mask = dR >> 31 : dR = (dR + mask) Xor mask
+                dG = LocalG(cIdx) - bG : mask = dG >> 31 : dG = (dG + mask) Xor mask
+                dB = LocalB(cIdx) - bB : mask = dB >> 31 : dB = (dB + mask) Xor mask
+                Dim dBist As Integer = dR + dG + dB
+                cornerTarget(c) = If(dA_dist < dBist, 0, 1)
+            Next
+            If cornerTarget(0) = 1 Then
+                For c As Integer = 0 To 3
+                    cornerTarget(c) = 1 - cornerTarget(c)
+                Next
+            End If
+            Dim shapeIndex As Integer = (cornerTarget(1) << 2) Or (cornerTarget(2) << 1) Or cornerTarget(3)
+            Dim partitionMap() As Integer = {-1, 11, 18, 13, 17, 0, 28, 6}
+            bestPartition = partitionMap(shapeIndex)
+            If bestPartition <> -1 Then
+                If MaxA - MinA > 0 Then
+                    useMode7 = True
+                Else
+                    useMode1 = True
+                End If
+            End If
         End If
-        Dim LowBytes As ULong = 0
-        LowBytes = LowBytes Or &H40UL
-        LowBytes = LowBytes Or (CULng(R0) << 7)
-        LowBytes = LowBytes Or (CULng(R1) << 14)
-        LowBytes = LowBytes Or (CULng(G0) << 21)
-        LowBytes = LowBytes Or (CULng(G1) << 28)
-        LowBytes = LowBytes Or (CULng(B0) << 35)
-        LowBytes = LowBytes Or (CULng(B1) << 42)
-        LowBytes = LowBytes Or (CULng(A0) << 49)
-        LowBytes = LowBytes Or (CULng(A1) << 56)
-        LowBytes = LowBytes Or (1UL << 63)
-        Dim HighBytes As ULong = 0
-        HighBytes = HighBytes Or 1UL
-        HighBytes = HighBytes Or ((ColorTable(0) And 7UL) << 1)
-        For i As Integer = 1 To 15
-            HighBytes = HighBytes Or ((ColorTable(i) And 15UL) << (i * 4))
-        Next
-        For i As Integer = 0 To 7
-            Result(OutputOffset + i) = CByte((LowBytes >> (i << 3)) And &HFFUL)
-        Next
-        For i As Integer = 0 To 7
-            Result(OutputOffset + 8 + i) = CByte((HighBytes >> (i << 3)) And &HFFUL)
-        Next
+        If useMode7 Then
+            EncodeMode7(bestPartition, LocalR, LocalG, LocalB, LocalA, Result, OutputOffset)
+            Return
+        End If
+        If useMode1 Then
+            EncodeMode1(bestPartition, LocalR, LocalG, LocalB, Result, OutputOffset)
+            Return
+        End If
+        EncodeMode6(MinR, MaxR, MinG, MaxG, MinB, MaxB, MinA, MaxA, LocalR, LocalG, LocalB, LocalA, ColorTable, Result, OutputOffset)
     End Sub
 
     Private Sub EncodeBlockBC3(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, ChannelOffset As Integer, Result As Byte(), OutputOffset As Integer, ChannelArray() As Integer)
@@ -640,6 +654,222 @@ Public Class DDS_Encoder
         Result(OutputOffset + 7) = CByte((ColorTable >> 24) And &HFF)
     End Sub
 
+#Region "BC7 Modes"
+
+    Private Sub EncodeMode1(bestPartition As Integer, LocalR() As Integer, LocalG() As Integer, LocalB() As Integer, Result As Byte(), OutputOffset As Integer)
+        Dim subMask = PartitionTable2(bestPartition)
+        Dim sMinR(1), sMaxR(1), sMinG(1), sMaxG(1), sMinB(1), sMaxB(1) As Integer
+        For s = 0 To 1
+            sMinR(s) = 255 : sMaxR(s) = 0 : sMinG(s) = 255 : sMaxG(s) = 0 : sMinB(s) = 255 : sMaxB(s) = 0
+        Next
+        For i = 0 To 15
+            Dim s = (subMask >> i) And 1
+            If LocalR(i) < sMinR(s) Then sMinR(s) = LocalR(i)
+            If LocalR(i) > sMaxR(s) Then sMaxR(s) = LocalR(i)
+            If LocalG(i) < sMinG(s) Then sMinG(s) = LocalG(i)
+            If LocalG(i) > sMaxG(s) Then sMaxG(s) = LocalG(i)
+            If LocalB(i) < sMinB(s) Then sMinB(s) = LocalB(i)
+            If LocalB(i) > sMaxB(s) Then sMaxB(s) = LocalB(i)
+        Next
+        Dim eR(1, 1), eG(1, 1), eB(1, 1) As Integer
+        Dim minLum(1), maxLum(1), range(1) As Integer
+        For s = 0 To 1
+            eR(s, 0) = sMinR(s) >> 2 : eR(s, 1) = sMaxR(s) >> 2
+            eG(s, 0) = sMinG(s) >> 2 : eG(s, 1) = sMaxG(s) >> 2
+            eB(s, 0) = sMinB(s) >> 2 : eB(s, 1) = sMaxB(s) >> 2
+            minLum(s) = sMinB(s) + (sMinG(s) << 1) + sMinR(s)
+            maxLum(s) = sMaxB(s) + (sMaxG(s) << 1) + sMaxR(s)
+            range(s) = maxLum(s) - minLum(s)
+            If range(s) < 1 Then range(s) = 1
+        Next
+        Dim anchor(1) As Integer
+        anchor(0) = 0
+        anchor(1) = AnchorIndexTable2(bestPartition)
+        Dim indices(15) As Integer
+        For i = 0 To 15
+            Dim s = (subMask >> i) And 1
+            Dim pixLum = LocalB(i) + (LocalG(i) << 1) + LocalR(i)
+            Dim index As Integer = ((pixLum - minLum(s)) * 7 + (range(s) >> 1)) \ range(s)
+            If index > 7 Then index = 7
+            If index < 0 Then index = 0
+            indices(i) = index
+        Next
+        For s = 0 To 1
+            If indices(anchor(s)) >= 4 Then
+                Dim temp As Integer
+                temp = eR(s, 0) : eR(s, 0) = eR(s, 1) : eR(s, 1) = temp
+                temp = eG(s, 0) : eG(s, 0) = eG(s, 1) : eG(s, 1) = temp
+                temp = eB(s, 0) : eB(s, 0) = eB(s, 1) : eB(s, 1) = temp
+                For i = 0 To 15
+                    If ((subMask >> i) And 1) = s Then indices(i) = 7 - indices(i)
+                Next
+            End If
+        Next
+        Dim Low1 As ULong = 0, High1 As ULong = 0
+        Low1 = Low1 Or 2UL
+        Low1 = Low1 Or (CULng(bestPartition) << 2)
+        Low1 = Low1 Or (CULng(eR(0, 0)) << 8)
+        Low1 = Low1 Or (CULng(eR(0, 1)) << 14)
+        Low1 = Low1 Or (CULng(eR(1, 0)) << 20)
+        Low1 = Low1 Or (CULng(eR(1, 1)) << 26)
+        Low1 = Low1 Or (CULng(eG(0, 0)) << 32)
+        Low1 = Low1 Or (CULng(eG(0, 1)) << 38)
+        Low1 = Low1 Or (CULng(eG(1, 0)) << 44)
+        Low1 = Low1 Or (CULng(eG(1, 1)) << 50)
+        Low1 = Low1 Or (CULng(eB(0, 0)) << 56)
+        Low1 = Low1 Or ((CULng(eB(0, 1)) And 3UL) << 62)
+        High1 = High1 Or ((CULng(eB(0, 1)) >> 2) And 15UL)
+        High1 = High1 Or (CULng(eB(1, 0)) << 4)
+        High1 = High1 Or (CULng(eB(1, 1)) << 10)
+        Dim bitOffset As Integer = 18
+        For i = 0 To 15
+            Dim bits As Integer = If(i = anchor(0) OrElse i = anchor(1), 2, 3)
+            High1 = High1 Or (CULng(indices(i)) << bitOffset)
+            bitOffset += bits
+        Next
+        For i As Integer = 0 To 7
+            Result(OutputOffset + i) = CByte((Low1 >> (i << 3)) And &HFFUL)
+            Result(OutputOffset + 8 + i) = CByte((High1 >> (i << 3)) And &HFFUL)
+        Next
+    End Sub
+
+    Private Sub EncodeMode7(bestPartition As Integer, LocalR() As Integer, LocalG() As Integer, LocalB() As Integer, LocalA() As Integer, Result As Byte(), OutputOffset As Integer)
+        Dim subMask = PartitionTable2(bestPartition)
+        Dim sMinR(1), sMaxR(1), sMinG(1), sMaxG(1), sMinB(1), sMaxB(1), sMinA(1), sMaxA(1) As Integer
+        For s = 0 To 1
+            sMinR(s) = 255 : sMaxR(s) = 0 : sMinG(s) = 255 : sMaxG(s) = 0
+            sMinB(s) = 255 : sMaxB(s) = 0 : sMinA(s) = 255 : sMaxA(s) = 0
+        Next
+        For i = 0 To 15
+            Dim s = (subMask >> i) And 1
+            If LocalR(i) < sMinR(s) Then sMinR(s) = LocalR(i)
+            If LocalR(i) > sMaxR(s) Then sMaxR(s) = LocalR(i)
+            If LocalG(i) < sMinG(s) Then sMinG(s) = LocalG(i)
+            If LocalG(i) > sMaxG(s) Then sMaxG(s) = LocalG(i)
+            If LocalB(i) < sMinB(s) Then sMinB(s) = LocalB(i)
+            If LocalB(i) > sMaxB(s) Then sMaxB(s) = LocalB(i)
+            If LocalA(i) < sMinA(s) Then sMinA(s) = LocalA(i)
+            If LocalA(i) > sMaxA(s) Then sMaxA(s) = LocalA(i)
+        Next
+        Dim eR(1, 1), eG(1, 1), eB(1, 1), eA(1, 1) As Integer
+        Dim minLum(1), maxLum(1), range(1) As Integer
+        For s = 0 To 1
+            eR(s, 0) = sMinR(s) >> 3 : eR(s, 1) = sMaxR(s) >> 3
+            eG(s, 0) = sMinG(s) >> 3 : eG(s, 1) = sMaxG(s) >> 3
+            eB(s, 0) = sMinB(s) >> 3 : eB(s, 1) = sMaxB(s) >> 3
+            eA(s, 0) = sMinA(s) >> 3 : eA(s, 1) = sMaxA(s) >> 3
+
+            minLum(s) = sMinB(s) + (sMinG(s) << 1) + sMinR(s) + sMinA(s)
+            maxLum(s) = sMaxB(s) + (sMaxG(s) << 1) + sMaxR(s) + sMaxA(s)
+            range(s) = maxLum(s) - minLum(s)
+            If range(s) < 1 Then range(s) = 1
+        Next
+        Dim anchor(1) As Integer
+        anchor(0) = 0
+        anchor(1) = AnchorIndexTable2(bestPartition)
+        Dim indices(15) As Integer
+        For i = 0 To 15
+            Dim s = (subMask >> i) And 1
+            Dim pixLum = LocalB(i) + (LocalG(i) << 1) + LocalR(i) + LocalA(i)
+            Dim index As Integer = ((pixLum - minLum(s)) * 3 + (range(s) >> 1)) \ range(s)
+            If index > 3 Then index = 3
+            If index < 0 Then index = 0
+            indices(i) = index
+        Next
+        For s = 0 To 1
+            If indices(anchor(s)) >= 2 Then
+                Dim temp As Integer
+                temp = eR(s, 0) : eR(s, 0) = eR(s, 1) : eR(s, 1) = temp
+                temp = eG(s, 0) : eG(s, 0) = eG(s, 1) : eG(s, 1) = temp
+                temp = eB(s, 0) : eB(s, 0) = eB(s, 1) : eB(s, 1) = temp
+                temp = eA(s, 0) : eA(s, 0) = eA(s, 1) : eA(s, 1) = temp
+                For i = 0 To 15
+                    If ((subMask >> i) And 1) = s Then indices(i) = 3 - indices(i)
+                Next
+            End If
+        Next
+        Dim Low1 As ULong = 128UL
+        Low1 = Low1 Or (CULng(bestPartition) << 8)
+        Low1 = Low1 Or (CULng(eR(0, 0)) << 14)
+        Low1 = Low1 Or (CULng(eR(0, 1)) << 19)
+        Low1 = Low1 Or (CULng(eR(1, 0)) << 24)
+        Low1 = Low1 Or (CULng(eR(1, 1)) << 29)
+        Low1 = Low1 Or (CULng(eG(0, 0)) << 34)
+        Low1 = Low1 Or (CULng(eG(0, 1)) << 39)
+        Low1 = Low1 Or (CULng(eG(1, 0)) << 44)
+        Low1 = Low1 Or (CULng(eG(1, 1)) << 49)
+        Low1 = Low1 Or (CULng(eB(0, 0)) << 54)
+        Low1 = Low1 Or (CULng(eB(0, 1)) << 59)
+        Dim High1 As ULong = 0
+        High1 = High1 Or CULng(eB(1, 0))
+        High1 = High1 Or (CULng(eB(1, 1)) << 5)
+        High1 = High1 Or (CULng(eA(0, 0)) << 10)
+        High1 = High1 Or (CULng(eA(0, 1)) << 15)
+        High1 = High1 Or (CULng(eA(1, 0)) << 20)
+        High1 = High1 Or (CULng(eA(1, 1)) << 25)
+        Dim bitOffset As Integer = 34
+        For i = 0 To 15
+            Dim bits As Integer = If(i = anchor(0) OrElse i = anchor(1), 1, 2)
+            High1 = High1 Or (CULng(indices(i)) << bitOffset)
+            bitOffset += bits
+        Next
+        For i As Integer = 0 To 7
+            Result(OutputOffset + i) = CByte((Low1 >> (i << 3)) And &HFFUL)
+            Result(OutputOffset + 8 + i) = CByte((High1 >> (i << 3)) And &HFFUL)
+        Next
+    End Sub
+
+    Private Sub EncodeMode6(MinR As Integer, MaxR As Integer, MinG As Integer, MaxG As Integer, MinB As Integer, MaxB As Integer, MinA As Integer, MaxA As Integer, LocalR() As Integer, LocalG() As Integer, LocalB() As Integer, LocalA() As Integer, ColorTable() As ULong, Result As Byte(), OutputOffset As Integer)
+        Dim R0 As Integer = MinR >> 1, R1 As Integer = MaxR >> 1
+        Dim G0 As Integer = MinG >> 1, G1 As Integer = MaxG >> 1
+        Dim B0 As Integer = MinB >> 1, B1 As Integer = MaxB >> 1
+        Dim A0 As Integer = MinA >> 1, A1 As Integer = MaxA >> 1
+        Dim MinLum6 As Integer = MinB + (MinG << 1) + MinR + MinA
+        Dim MaxLum6 As Integer = MaxB + (MaxG << 1) + MaxR + MaxA
+        Dim Range6 As Integer = MaxLum6 - MinLum6
+        If Range6 < 1 Then Range6 = 1
+        For i As Integer = 0 To 15
+            Dim PixLum As Integer = LocalB(i) + (LocalG(i) << 1) + LocalR(i) + LocalA(i)
+            Dim Index As Integer = ((PixLum - MinLum6) * 15 + (Range6 >> 1)) \ Range6
+            If Index > 15 Then Index = 15
+            If Index < 0 Then Index = 0
+            ColorTable(i) = CULng(Index)
+        Next
+        If ColorTable(0) >= 8UL Then
+            Dim Temp As Integer
+            Temp = R0 : R0 = R1 : R1 = Temp
+            Temp = G0 : G0 = G1 : G1 = Temp
+            Temp = B0 : B0 = B1 : B1 = Temp
+            Temp = A0 : A0 = A1 : A1 = Temp
+            For i As Integer = 0 To 15
+                ColorTable(i) = 15UL - ColorTable(i)
+            Next
+        End If
+        Dim LowBytes As ULong = 0
+        LowBytes = LowBytes Or &H40UL
+        LowBytes = LowBytes Or (CULng(R0) << 7)
+        LowBytes = LowBytes Or (CULng(R1) << 14)
+        LowBytes = LowBytes Or (CULng(G0) << 21)
+        LowBytes = LowBytes Or (CULng(G1) << 28)
+        LowBytes = LowBytes Or (CULng(B0) << 35)
+        LowBytes = LowBytes Or (CULng(B1) << 42)
+        LowBytes = LowBytes Or (CULng(A0) << 49)
+        LowBytes = LowBytes Or (CULng(A1) << 56)
+        LowBytes = LowBytes Or (1UL << 63)
+        Dim HighBytes As ULong = 0
+        HighBytes = HighBytes Or 1UL
+        HighBytes = HighBytes Or ((ColorTable(0) And 7UL) << 1)
+        For i As Integer = 1 To 15
+            HighBytes = HighBytes Or ((ColorTable(i) And 15UL) << (i * 4))
+        Next
+        For i As Integer = 0 To 7
+            Result(OutputOffset + i) = CByte((LowBytes >> (i << 3)) And &HFFUL)
+            Result(OutputOffset + 8 + i) = CByte((HighBytes >> (i << 3)) And &HFFUL)
+        Next
+    End Sub
+
+#End Region
+
     Public Sub Save(FilePath As String)
         If CubeFaces IsNot Nothing Then
             BeginEncodeCube()
@@ -669,20 +899,32 @@ Public Class DDS_Encoder
         Dim TempWidth As Integer = Math.Max(1, Width >> 1)
         Dim TempHeight As Integer = Math.Max(1, Height >> 1)
         Dim DestData(TempWidth * TempHeight * 4 - 1) As Byte
-        For y As Integer = 0 To TempHeight - 1
-            Dim srcY0 As Integer = (y << 1) * Width * 4
-            Dim srcY1 As Integer = Math.Min((y << 1) + 1, Height - 1) * Width * 4
-            Dim destRowOffset As Integer = y * TempWidth * 4
-            For x As Integer = 0 To TempWidth - 1
-                Dim x0 As Integer = (x << 1) * 4
-                Dim x1 As Integer = Math.Min((x << 1) + 1, Width - 1) * 4
-                Dim destPixelOffset As Integer = destRowOffset + (x * 4)
-                For c As Integer = 0 To 3
-                    Dim sum As Integer = CInt(SourceData(srcY0 + x0 + c)) + SourceData(srcY0 + x1 + c) + SourceData(srcY1 + x0 + c) + SourceData(srcY1 + x1 + c)
-                    DestData(destPixelOffset + c) = CByte(sum >> 2)
-                Next
-            Next
-        Next
+        Parallel.For(0, TempHeight, Options, Sub(y)
+                                                 Dim destRowOffset As Integer = y * TempWidth * 4
+                                                 For x As Integer = 0 To TempWidth - 1
+                                                     Dim destPixelOffset As Integer = destRowOffset + (x * 4)
+                                                     Dim sumB As Integer = 0, sumG As Integer = 0, sumR As Integer = 0, sumA As Integer = 0
+                                                     Dim weightIdx As Integer = 0
+                                                     For sy As Integer = -1 To 2
+                                                         Dim srcY As Integer = Math.Max(0, Math.Min((y << 1) + sy, Height - 1))
+                                                         Dim srcRowOffset As Integer = srcY * Width * 4
+                                                         For sx As Integer = -1 To 2
+                                                             Dim srcX As Integer = Math.Max(0, Math.Min((x << 1) + sx, Width - 1))
+                                                             Dim srcPixelOffset As Integer = srcRowOffset + (srcX * 4)
+                                                             Dim w As Integer = Weight4x4(weightIdx)
+                                                             weightIdx += 1
+                                                             sumB += SourceData(srcPixelOffset) * w
+                                                             sumG += SourceData(srcPixelOffset + 1) * w
+                                                             sumR += SourceData(srcPixelOffset + 2) * w
+                                                             sumA += SourceData(srcPixelOffset + 3) * w
+                                                         Next
+                                                     Next
+                                                     DestData(destPixelOffset) = CByte(Math.Max(0, Math.Min(255, sumB >> 8)))
+                                                     DestData(destPixelOffset + 1) = CByte(Math.Max(0, Math.Min(255, sumG >> 8)))
+                                                     DestData(destPixelOffset + 2) = CByte(Math.Max(0, Math.Min(255, sumR >> 8)))
+                                                     DestData(destPixelOffset + 3) = CByte(Math.Max(0, Math.Min(255, sumA >> 8)))
+                                                 Next
+                                             End Sub)
         Return DestData
     End Function
 

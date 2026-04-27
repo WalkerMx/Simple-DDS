@@ -124,6 +124,7 @@ Public Module DDS_Common
     Public ReadOnly Weight2() As Integer = {0, 21, 43, 64}
     Public ReadOnly Weight3() As Integer = {0, 9, 18, 27, 37, 46, 55, 64}
     Public ReadOnly Weight4() As Integer = {0, 4, 9, 13, 17, 21, 26, 30, 34, 38, 43, 47, 51, 55, 60, 64}
+    Public ReadOnly Weight4x4() As Integer = {1, -9, -9, 1, -9, 81, 81, -9, -9, 81, 81, -9, 1, -9, -9, 1}
 
     Public ReadOnly AnchorIndexTable2() As Integer = {
         15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,

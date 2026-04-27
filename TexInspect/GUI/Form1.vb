@@ -101,22 +101,7 @@ Public Class Form1
 
     Private Sub LoadStandardImage(Path As String)
         Dim DetectedFaces As String() = DetectCubeFiles(Path)
-        If DetectCompositeCube(Path) = True Then
-            If MessageBox.Show("Potential CubeMap detected.  Slice and load?", "CubeMap Detected", MessageBoxButtons.YesNo, MessageBoxIcon.Information) = DialogResult.Yes Then
-                Using Slicer As New CubeSlicer(Path)
-                    TempPath = $"{IO.Path.GetTempPath}TexTemp\"
-                    Directory.CreateDirectory(TempPath)
-                    Slicer.SaveBitmaps(TempPath)
-                    DetectedFaces = New String(5) {}
-                    For i As Integer = 0 To 5
-                        Dim FacePath As String = IO.Path.Combine($"{TempPath}Face{CubeSuffixes(i)}.png")
-                        If File.Exists(FacePath) Then
-                            DetectedFaces(i) = FacePath
-                        End If
-                    Next
-                End Using
-            End If
-        End If
+        If DetectedFaces Is Nothing Then DetectedFaces = DetectCompositeCube(Path)
         If DetectedFaces IsNot Nothing Then
             CubeMode = True
             FilePaths = DetectedFaces
@@ -236,7 +221,7 @@ Public Class Form1
                 Using TempImage As Bitmap = LoadBitmapForMetrics(OFD.FileName)
                     Using QualityTest As New ImageMetrics(PreviewImage, TempImage)
                         QualityTest.CalcAll()
-                        QualityReport = $"MSE: {Math.Round(QualityTest.MSE.Average, 4)} | PSNR: {Math.Round(QualityTest.PSNR.Average, 4)} | SSIM: {Math.Round(QualityTest.SSIM.Average, 4)}"
+                        QualityReport = $"MSE: {Math.Round(QualityTest.MSE.Average, 4)} {vbCrLf} PSNR: {Math.Round(QualityTest.PSNR.Average, 4)} {vbCrLf} SSIM: {Math.Round(QualityTest.SSIM.Average, 4)}"
                     End Using
                 End Using
                 MessageBox.Show(QualityReport, "Report", MessageBoxButtons.OK, MessageBoxIcon.Information)
@@ -458,8 +443,7 @@ Public Class Form1
         End If
     End Function
 
-    Private Function DetectCompositeCube(Source As String) As Boolean
-        Dim Result As Boolean = False
+    Private Function DetectCompositeCube(Source As String) As String()
         Dim TempWidth As Long, TempHeight As Long
         Using fs As New FileStream(Source, FileMode.Open, FileAccess.Read, FileShare.Read)
             Using TempImage = Image.FromStream(fs, False, False)
@@ -467,9 +451,26 @@ Public Class Form1
                 TempHeight = TempImage.Height
             End Using
         End Using
-        If (TempWidth * 6 = TempHeight) OrElse (TempHeight * 6 = TempWidth) Then Return True
-        If (TempWidth * 4 = TempHeight * 3) OrElse (TempWidth * 3 = TempHeight * 4) Then Return True
-        Return False
+        If (TempWidth * 6 = TempHeight) OrElse (TempHeight * 6 = TempWidth) OrElse (TempWidth * 4 = TempHeight * 3) OrElse (TempWidth * 3 = TempHeight * 4) Then
+        Else
+            Return Nothing
+        End If
+        If MessageBox.Show("Potential CubeMap detected.  Slice and load?", "CubeMap Detected", MessageBoxButtons.YesNo, MessageBoxIcon.Information) = DialogResult.Yes Then
+            Using Slicer As New CubeSlicer(Source)
+                Dim Result As String() = New String(5) {}
+                TempPath = $"{Path.GetTempPath}TexTemp\"
+                Directory.CreateDirectory(TempPath)
+                Slicer.SaveBitmaps(TempPath)
+                For i As Integer = 0 To 5
+                    Dim FacePath As String = Path.Combine($"{TempPath}Face{CubeSuffixes(i)}.png")
+                    If File.Exists(FacePath) Then
+                        Result(i) = FacePath
+                    End If
+                Next
+                Return Result
+            End Using
+        End If
+        Return Nothing
     End Function
 
     Private Function GetBounds(Source As String) As Integer()
