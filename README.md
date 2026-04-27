@@ -9,7 +9,7 @@ A lightweight, fully managed DDS encoder and decoder. TexInspect is a zero-depen
 * **Supported Modes:**
     * **Encoding:** BC1 (DXT1), BC2 (DXT3), BC3 (DXT5), BC4 (ATI1), BC5 (ATI2), and BC7 (Fast).
     * **Decoding:** BC1 (DXT1), BC2 (DXT3), BC3 (DXT5), BC4 (ATI1), BC5 (ATI2), and BC7 (Full).
-* **MipMaps:** Automated chain generation using box-filter downsampling.
+* **MipMaps:** Automated chain generation using Catmull-Rom downsampling.
 * **CubeMaps:** Automated decoding and saving of CubeMap arrays.
 * **Quality Analysis:** Supports assessing MSE, PSNR, and SSIM.
 * **Headers:** Supports Legacy FourCC and modern DX10 (DXGI_Format) extended headers.
@@ -32,7 +32,7 @@ A lightweight, fully managed DDS encoder and decoder. TexInspect is a zero-depen
 > GPU requirements are recommended minimums for the OS.  TexInspect is GPU-agnostic.
 
 ## Performance
-Comparison testing was done on a Xeon E3-1260L (2011), strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses BC7 Mode 6 only, for fast, high-quality block compression.  Note that actual encoding and decoding times will be much faster on newer CPUs.
+Comparison testing was done on a Xeon E3-1260L (2011), strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses an optimized single-pass BC7 algorithm, for fast, high-quality block compression.  Note that actual encoding and decoding times will be much faster on newer CPUs.
 
 ### Encoding
 | | TexConv 4K | TexInspect 4K | Delta |
@@ -41,8 +41,8 @@ Comparison testing was done on a Xeon E3-1260L (2011), strictly on the CPU.  Res
 | BC1 Full Mips | 1,229.55ms | 699.64ms | 1.8x Faster |
 | BC3 No Mips | 1,086.78ms | 526.18ms | 2.1x Faster |
 | BC3 Full Mips | 2,063.11ms | 814.26ms | 2.5x Faster |
-| BC7 (Mode 6) No Mips | 74,101ms | 525.54ms | 141.1x Faster |
-| BC7 (Mode 6) Full Mips | 102,513ms | 819.28ms | 125.1x Faster |
+| BC7 (Fast) No Mips | 74,101ms | 525.54ms | 141.1x Faster |
+| BC7 (Fast) Full Mips | 102,513ms | 819.28ms | 125.1x Faster |
 
 ### Decoding
 | | TexConv 4K | TexInspect 4K | Delta |
