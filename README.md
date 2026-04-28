@@ -32,7 +32,7 @@ A lightweight, fully managed DDS encoder and decoder. TexInspect is a zero-depen
 > GPU requirements are recommended minimums for the OS.  TexInspect is GPU-agnostic.
 
 ## Performance
-Comparison testing was done on a i9-9980HK (2019), strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses an optimized single-pass BC7 algorithm, for fast, high-quality block compression.
+Comparison testing was done on a i9-9980HK (2019), strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; TexInspect uses an optimized single-pass BC7 algorithm, for fast, high-quality block compression.
 
 ### Encoding
 | | TexInspect 4K | TexConv 4K | Delta |
