@@ -32,24 +32,27 @@ A lightweight, fully managed DDS encoder and decoder. TexInspect is a zero-depen
 > GPU requirements are recommended minimums for the OS.  TexInspect is GPU-agnostic.
 
 ## Performance
-Comparison testing was done on a Xeon E3-1260L (2011), strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses an optimized single-pass BC7 algorithm, for fast, high-quality block compression.  Note that actual encoding and decoding times will be much faster on newer CPUs.
+Comparison testing was done on a i9-9980HK (2019), strictly on the CPU.  Results are taken from a 50-run average.  Texconv was run with the "-bc q" flag; Simple-DDS uses an optimized single-pass BC7 algorithm, for fast, high-quality block compression.
 
 ### Encoding
-| | TexConv 4K | TexInspect 4K | Delta |
+| | TexInspect 4K | TexConv 4K | Delta |
 | :--- | :--- | :--- | :--- |
-| BC1 No Mips | 663.34ms | 452.58ms | 1.5x Faster |
-| BC1 Full Mips | 1,229.55ms | 699.64ms | 1.8x Faster |
-| BC3 No Mips | 1,086.78ms | 526.18ms | 2.1x Faster |
-| BC3 Full Mips | 2,063.11ms | 814.26ms | 2.5x Faster |
-| BC7 (Fast) No Mips | 74,101ms | 525.54ms | 141.1x Faster |
-| BC7 (Fast) Full Mips | 102,513ms | 819.28ms | 125.1x Faster |
+| BC7 No Mips | 292.5ms | 23226.3ms | 79.4x Faster |
+| BC7 Full Mips | 477.24ms | 32747.8ms | 68.6x Faster |
+| BC5 No Mips | 246.38ms | 215.8ms | 1.1x Slower |
+| BC5 Full Mips | 395.46ms | 513.9ms | 1.3x Faster |
+| BC3 No Mips | 252.8ms | 428.0ms | 1.7x Faster |
+| BC3 Full Mips | 406.38ms | 790.5ms | 1.9x Faster |
+| BC1 No Mips | 234.28ms | 409.6ms | 1.7x Faster |
+| BC1 Full Mips | 361.72ms | 766.7ms | 2.1x Faster |
 
 ### Decoding
 | | TexConv 4K | TexInspect 4K | Delta |
 | :--- | :--- | :--- | :--- |
-| BC1 to PNG | 2,105.18ms | 305.28ms | 6.9x Faster |
-| BC3 to PNG | 2,033.15ms | 380.66ms | 5.3x Faster |
-| BC7 to PNG | 2,993.03ms | 620.08ms | 4.8x Faster |
+| BC7 | 77.78ms | 1600.1ms | 20.6x Faster |
+| BC5 | 69.76ms | 423.3ms | 6.1x Faster |
+| BC3 | 81.84ms | 1380.4ms | 16.9x Faster |
+| BC1 | 62.62ms | 1354.0ms | 21.6x Faster |
 
 ## Quality
 Kodak Lossless TrueColor Image Suite SSIM Benchmark (24 Images)
