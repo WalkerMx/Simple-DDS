@@ -37,8 +37,8 @@ Comparison testing was done on a i9-9980HK (2019), strictly on the CPU.  Results
 ### Encoding
 | | TexInspect 4K | TexConv 4K | Delta |
 | :--- | :--- | :--- | :--- |
-| BC7 No Mips | 292.5ms | 23226.3ms | 79.4x Faster |
-| BC7 Full Mips | 477.24ms | 32747.8ms | 68.6x Faster |
+| BC7 No Mips | 255.54ms | 23226.3ms | 90.8x Faster |
+| BC7 Full Mips | 423.56ms | 32747.8ms | 77.3x Faster |
 | BC5 No Mips | 246.38ms | 215.8ms | 1.1x Slower |
 | BC5 Full Mips | 395.46ms | 513.9ms | 1.3x Faster |
 | BC3 No Mips | 252.8ms | 428.0ms | 1.7x Faster |
