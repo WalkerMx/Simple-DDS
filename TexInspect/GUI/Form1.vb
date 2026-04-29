@@ -2,6 +2,7 @@
 Imports System.Text
 Imports System.Numerics
 Imports System.Drawing.Imaging
+Imports System.Drawing.Drawing2D
 
 Public Class Form1
 
@@ -21,6 +22,7 @@ Public Class Form1
 
     Private Class CubeFace
         Public Image As Bitmap
+        Public PreviewImage As Bitmap
         Public V0 As Integer
         Public V1 As Integer
         Public V2 As Integer
@@ -31,6 +33,11 @@ Public Class Form1
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         DoubleBuffered = True
         OutputFormatComboBox.SelectedIndex = 0
+        Dim Args As String() = Environment.GetCommandLineArgs()
+        If Args.Count > 1 AndAlso Args(1) = "-h" Then
+            Options = New ParallelOptions With {.MaxDegreeOfParallelism = Environment.ProcessorCount}
+            Me.Text = "TexInspect - All Cores Mode"
+        End If
         InitCubeVertices()
     End Sub
 
@@ -278,9 +285,9 @@ Public Class Form1
 
     Private Sub PictureBox1_Paint(sender As Object, e As PaintEventArgs) Handles PreviewPictureBox.Paint
         If Not CubeMode Then Return
-        e.Graphics.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
-        e.Graphics.InterpolationMode = Drawing2D.InterpolationMode.NearestNeighbor
-        e.Graphics.PixelOffsetMode = Drawing2D.PixelOffsetMode.Half
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias
+        e.Graphics.InterpolationMode = InterpolationMode.NearestNeighbor
+        e.Graphics.PixelOffsetMode = PixelOffsetMode.Half
         RenderCube(e.Graphics)
     End Sub
 
@@ -327,10 +334,10 @@ Public Class Form1
             New Single() {0, 0, 0, 1, 0},
             New Single() {0, 0, 0, 0, 1}})
         Using ImgAttr As New ImageAttributes()
-            ImgAttr.SetWrapMode(Drawing2D.WrapMode.TileFlipXY)
+            ImgAttr.SetWrapMode(WrapMode.TileFlipXY)
             ImgAttr.SetColorMatrix(ShadingMatrix)
-            Dim Rect As New Rectangle(0, 0, Face.Image.Width, Face.Image.Height)
-            g.DrawImage(Face.Image, DestPoints, Rect, GraphicsUnit.Pixel, ImgAttr)
+            Dim Rect As New Rectangle(0, 0, Face.PreviewImage.Width, Face.PreviewImage.Height)
+            g.DrawImage(Face.PreviewImage, DestPoints, Rect, GraphicsUnit.Pixel, ImgAttr)
         End Using
     End Sub
 
@@ -346,12 +353,12 @@ Public Class Form1
     End Sub
 
     Private Sub LoadCubeMaps(CubeFaces As CubeFace(), CubeMapImages As Bitmap())
-        CubeFaces(0) = New CubeFace With {.V0 = 1, .V1 = 5, .V2 = 6, .V3 = 2, .Normal = New Vector3(1, 0, 0), .Image = CubeMapImages(0)}
-        CubeFaces(1) = New CubeFace With {.V0 = 4, .V1 = 0, .V2 = 3, .V3 = 7, .Normal = New Vector3(-1, 0, 0), .Image = CubeMapImages(1)}
-        CubeFaces(2) = New CubeFace With {.V0 = 4, .V1 = 5, .V2 = 1, .V3 = 0, .Normal = New Vector3(0, 1, 0), .Image = CubeMapImages(2)}
-        CubeFaces(3) = New CubeFace With {.V0 = 3, .V1 = 2, .V2 = 6, .V3 = 7, .Normal = New Vector3(0, -1, 0), .Image = CubeMapImages(3)}
-        CubeFaces(4) = New CubeFace With {.V0 = 0, .V1 = 1, .V2 = 2, .V3 = 3, .Normal = New Vector3(0, 0, 1), .Image = CubeMapImages(4)}
-        CubeFaces(5) = New CubeFace With {.V0 = 5, .V1 = 4, .V2 = 7, .V3 = 6, .Normal = New Vector3(0, 0, -1), .Image = CubeMapImages(5)}
+        CubeFaces(0) = New CubeFace With {.V0 = 1, .V1 = 5, .V2 = 6, .V3 = 2, .Normal = New Vector3(1, 0, 0), .Image = CubeMapImages(0), .PreviewImage = GetPreviewImage(CubeMapImages(0))}
+        CubeFaces(1) = New CubeFace With {.V0 = 4, .V1 = 0, .V2 = 3, .V3 = 7, .Normal = New Vector3(-1, 0, 0), .Image = CubeMapImages(1), .PreviewImage = GetPreviewImage(CubeMapImages(1))}
+        CubeFaces(2) = New CubeFace With {.V0 = 4, .V1 = 5, .V2 = 1, .V3 = 0, .Normal = New Vector3(0, 1, 0), .Image = CubeMapImages(2), .PreviewImage = GetPreviewImage(CubeMapImages(2))}
+        CubeFaces(3) = New CubeFace With {.V0 = 3, .V1 = 2, .V2 = 6, .V3 = 7, .Normal = New Vector3(0, -1, 0), .Image = CubeMapImages(3), .PreviewImage = GetPreviewImage(CubeMapImages(3))}
+        CubeFaces(4) = New CubeFace With {.V0 = 0, .V1 = 1, .V2 = 2, .V3 = 3, .Normal = New Vector3(0, 0, 1), .Image = CubeMapImages(4), .PreviewImage = GetPreviewImage(CubeMapImages(4))}
+        CubeFaces(5) = New CubeFace With {.V0 = 5, .V1 = 4, .V2 = 7, .V3 = 6, .Normal = New Vector3(0, 0, -1), .Image = CubeMapImages(5), .PreviewImage = GetPreviewImage(CubeMapImages(5))}
     End Sub
 
     Private Function GetImageFormatFromExtension(Ext As String) As ImageFormat
@@ -473,6 +480,24 @@ Public Class Form1
         Return Nothing
     End Function
 
+    Public Function GetPreviewImage(Source As Image) As Image
+        If Source Is Nothing Then Throw New ArgumentNullException(NameOf(Source))
+        If Source.Width <= 512 Then
+            Return Source
+        End If
+        Dim TempImage As New Bitmap(512, 512, PixelFormat.Format32bppArgb)
+        Using g As Graphics = Graphics.FromImage(TempImage)
+            g.CompositingMode = CompositingMode.SourceCopy
+            g.PixelOffsetMode = PixelOffsetMode.Half
+            g.InterpolationMode = InterpolationMode.Bilinear
+            Using Attrib As New ImageAttributes()
+                Attrib.SetWrapMode(WrapMode.TileFlipXY)
+                g.DrawImage(Source, New Rectangle(0, 0, 512, 512), 0, 0, Source.Width, Source.Height, GraphicsUnit.Pixel, Attrib)
+            End Using
+        End Using
+        Return TempImage
+    End Function
+
     Private Function GetBounds(Source As String) As Integer()
         Using fs As New FileStream(Source, FileMode.Open, FileAccess.Read)
             Using TempImage = Image.FromStream(fs, False, False)
@@ -492,6 +517,8 @@ Public Class Form1
             If Face IsNot Nothing AndAlso Face.Image IsNot Nothing Then
                 Face.Image.Dispose()
                 Face.Image = Nothing
+                Face.PreviewImage.Dispose()
+                Face.PreviewImage = Nothing
             End If
         Next
     End Sub

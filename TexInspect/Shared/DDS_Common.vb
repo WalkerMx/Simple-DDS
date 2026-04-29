@@ -5,7 +5,7 @@
 
 Public Module DDS_Common
 
-    Public ReadOnly Options As New ParallelOptions With {.MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount - 1)}
+    Public Options As New ParallelOptions With {.MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount - 1)}
 
     <Flags>
     Public Enum DDS_SurfaceFlags
@@ -118,6 +118,10 @@ Public Module DDS_Common
         DDS_ALPHA_MODE_OPAQUE = &H3
         DDS_ALPHA_MODE_CUSTOM = &H4
     End Enum
+
+
+    Public ReadOnly BlockCorners() As Integer = {0, 3, 12, 15}
+    Public ReadOnly ParitionMap() As Integer = {-1, 11, 18, 13, 17, 0, 28, 6}
 
     Public ReadOnly CubeSuffixes As String() = {"_PX", "_NX", "_PY", "_NY", "_PZ", "_NZ"}
 
