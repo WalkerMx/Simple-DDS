@@ -47,7 +47,7 @@ Comparison testing was done on a i9-9980HK (2019), strictly on the CPU.  Results
 | BC1 Full Mips | 361.72ms | 766.7ms | 2.1x Faster |
 
 ### Decoding
-| | TexConv 4K | TexInspect 4K | Delta |
+| | TexInspect 4K | TexConv 4K | Delta |
 | :--- | :--- | :--- | :--- |
 | BC7 | 77.78ms | 1600.1ms | 20.6x Faster |
 | BC5 | 69.76ms | 423.3ms | 6.1x Faster |
