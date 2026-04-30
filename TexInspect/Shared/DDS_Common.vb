@@ -119,34 +119,20 @@ Public Module DDS_Common
         DDS_ALPHA_MODE_CUSTOM = &H4
     End Enum
 
-
+    ' BC7 Mode 1/7 Heuristic Tables
     Public ReadOnly BlockCorners() As Integer = {0, 3, 12, 15}
     Public ReadOnly ParitionMap() As Integer = {-1, 11, 18, 13, 17, 0, 28, 6}
 
+    ' Catmull-Rom Weight Table
+    Public ReadOnly Weight4x4() As Integer = {1, -9, -9, 1, -9, 81, 81, -9, -9, 81, 81, -9, 1, -9, -9, 1}
+
+    ' Cubemap File Extension Table
     Public ReadOnly CubeSuffixes As String() = {"_PX", "_NX", "_PY", "_NY", "_PZ", "_NZ"}
 
+    ' BC7 Mode, Weight, Anchor, and Parition Tables
     Public ReadOnly Weight2() As Integer = {0, 21, 43, 64}
     Public ReadOnly Weight3() As Integer = {0, 9, 18, 27, 37, 46, 55, 64}
     Public ReadOnly Weight4() As Integer = {0, 4, 9, 13, 17, 21, 26, 30, 34, 38, 43, 47, 51, 55, 60, 64}
-    Public ReadOnly Weight4x4() As Integer = {1, -9, -9, 1, -9, 81, 81, -9, -9, 81, 81, -9, 1, -9, -9, 1}
-
-    Public ReadOnly AnchorIndexTable2() As Integer = {
-        15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-        15, 2, 8, 2, 2, 8, 8, 15, 2, 8, 2, 2, 8, 8, 2, 2,
-        15, 15, 6, 8, 2, 8, 15, 15, 2, 8, 2, 2, 2, 15, 15, 6,
-        6, 2, 6, 8, 15, 15, 2, 2, 15, 15, 15, 15, 15, 2, 2, 15}
-
-    Public ReadOnly AnchorIndexTable3_1() As Integer = {
-        3, 3, 15, 15, 8, 3, 15, 15, 8, 8, 6, 6, 6, 5, 3, 3,
-        3, 3, 8, 15, 3, 3, 6, 10, 5, 8, 8, 6, 8, 5, 12, 12,
-        8, 8, 5, 5, 3, 15, 3, 5, 6, 10, 6, 6, 10, 8, 5, 5,
-        15, 3, 15, 5, 15, 15, 15, 15, 3, 15, 5, 5, 5, 8, 5, 10}
-
-    Public ReadOnly AnchorIndexTable3_2() As Integer = {
-        15, 8, 8, 3, 15, 15, 3, 8, 15, 15, 15, 15, 15, 15, 15, 8,
-        15, 8, 15, 3, 15, 8, 15, 8, 3, 15, 6, 10, 15, 15, 10, 8,
-        15, 3, 15, 10, 10, 8, 9, 10, 6, 15, 8, 15, 3, 6, 6, 8,
-        15, 3, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 3, 15, 15, 8}
 
     Public ReadOnly ModeLUT() As Integer = {
         8, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
@@ -165,6 +151,24 @@ Public Module DDS_Common
         4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
         5, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
         4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0}
+
+    Public ReadOnly AnchorIndexTable2() As Integer = {
+        15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+        15, 2, 8, 2, 2, 8, 8, 15, 2, 8, 2, 2, 8, 8, 2, 2,
+        15, 15, 6, 8, 2, 8, 15, 15, 2, 8, 2, 2, 2, 15, 15, 6,
+        6, 2, 6, 8, 15, 15, 2, 2, 15, 15, 15, 15, 15, 2, 2, 15}
+
+    Public ReadOnly AnchorIndexTable3_1() As Integer = {
+        3, 3, 15, 15, 8, 3, 15, 15, 8, 8, 6, 6, 6, 5, 3, 3,
+        3, 3, 8, 15, 3, 3, 6, 10, 5, 8, 8, 6, 8, 5, 12, 12,
+        8, 8, 5, 5, 3, 15, 3, 5, 6, 10, 6, 6, 10, 8, 5, 5,
+        15, 3, 15, 5, 15, 15, 15, 15, 3, 15, 5, 5, 5, 8, 5, 10}
+
+    Public ReadOnly AnchorIndexTable3_2() As Integer = {
+        15, 8, 8, 3, 15, 15, 3, 8, 15, 15, 15, 15, 15, 15, 15, 8,
+        15, 8, 15, 3, 15, 8, 15, 8, 3, 15, 6, 10, 15, 15, 10, 8,
+        15, 3, 15, 10, 10, 8, 9, 10, 6, 15, 8, 15, 3, 6, 6, 8,
+        15, 3, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 3, 15, 15, 8}
 
     Public ReadOnly PartitionTable2() As Integer = {
         &HCCCC, &H8888, &HEEEE, &HECC8, &HC880, &HFEEC, &HFEC8, &HEC80,
@@ -185,15 +189,5 @@ Public Module DDS_Common
         &H500AA550UI, &HAAAA4444UI, &H66660000UI, &HA5A0A5A0UI, &H50A050A0UI, &H69286928UI, &H44AAAA44UI, &H66666600UI,
         &HAA444444UI, &H54A854A8UI, &H95809580UI, &H96969600UI, &HA85454A8UI, &H80959580UI, &HAA141414UI, &H96960000UI,
         &HAAAA1414UI, &HA05050A0UI, &HA0A5A5A0UI, &H96000000UI, &H40804080UI, &HA9A8A9A8UI, &HAAAAAA44UI, &H2A4A5254UI}
-
-    Public Function Clamp(Value As Integer, MinValue As Integer, MaxValue As Integer) As Integer
-        Return Math.Max(MinValue, Math.Min(Value, MaxValue))
-    End Function
-
-    Public Sub Swap(Of T)(ByRef Value1 As T, ByRef Value2 As T)
-        Dim Temp As T = Value1
-        Value1 = Value2
-        Value2 = Temp
-    End Sub
 
 End Module

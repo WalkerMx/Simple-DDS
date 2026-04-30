@@ -3,10 +3,9 @@
 ' http://doc.51windows.net/directx9_sdk/graphics/reference/DDSFileReference/ddsfileformat.htm
 ' https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds
 
+Imports System.IO
 Imports System.Drawing
 Imports System.Drawing.Imaging
-Imports System.IO
-Imports System.Runtime.CompilerServices
 Imports System.Runtime.InteropServices
 
 Public Class DDS_Encoder
@@ -327,7 +326,11 @@ Public Class DDS_Encoder
 
     Private Function WriteUncompressed(SourceData As Byte(), Alpha As Boolean) As Byte()
         If Alpha Then
-            Return DirectCast(SourceData.Clone(), Byte())
+            If MipCount > 1 Then
+                Return DirectCast(SourceData.Clone(), Byte())
+            Else
+                Return SourceData
+            End If
         End If
         Dim Result(SourceData.Length - 1) As Byte
         Buffer.BlockCopy(SourceData, 0, Result, 0, SourceData.Length)
@@ -511,7 +514,7 @@ Public Class DDS_Encoder
             ElseIf v = Val1 Then
                 Index = 1
             Else
-                Index = CByte(Clamp(7 - ((CInt(v) - Val1) * 7 \ Range), 2, 7))
+                Index = CByte(Math.Max(2, Math.Min(7 - ((CInt(v) - Val1) * 7 \ Range), 7)))
             End If
             BitBuffer = BitBuffer Or (CLng(Index) << BitsLoaded)
             BitsLoaded += 3

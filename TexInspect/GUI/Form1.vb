@@ -135,10 +135,14 @@ Public Class Form1
         If isError Then
             DDSExportGroup.Enabled = False
             ImageExportGroup.Enabled = False
+            BenchGroupBox.Enabled = False
             Return
         End If
         DDSExportGroup.Enabled = Not isDDS
         ImageExportGroup.Enabled = isDDS
+        EncBenchButton.Enabled = Not isDDS
+        DecBenchButton.Enabled = isDDS
+        BenchGroupBox.Enabled = True
     End Sub
 
     Private Sub UpdatePreviewState()
@@ -190,35 +194,40 @@ Public Class Form1
         End Using
     End Sub
 
-    Private Sub EncBenchButton_Click(sender As Object, e As EventArgs) Handles EncBenchButton.Click
-        RunBenchmark("Image Files|*.png;*.jpg;*.bmp", Sub(FileName)
-                                                          Dim targetFormat As DXGI_Format = GetFormatFromString(OverrideComboBox.SelectedItem.ToString())
-                                                          Using Encoder As New DDS_Encoder(FileName, targetFormat, MipMapCheckBox.Checked, Not ExtendedHeaderCheckBox.Checked)
-                                                              Encoder.BeginEncode()
-                                                          End Using
-                                                      End Sub)
+    Private Async Sub EncBenchButton_Click(sender As Object, e As EventArgs) Handles EncBenchButton.Click
+        Dim TempFmt As String = OverrideComboBox.SelectedItem.ToString()
+        Dim TempMips As Boolean = MipMapCheckBox.Checked
+        Dim TempDX10 As Boolean = ExtendedHeaderCheckBox.Checked
+        ToggleBusyState(True)
+        Await RunBenchmarkAsync(Sub(FileName)
+                                    Dim targetFormat As DXGI_Format = GetFormatFromString(TempFmt)
+                                    Using Encoder As New DDS_Encoder(FileName, targetFormat, TempMips, Not TempDX10)
+                                        Encoder.BeginEncode()
+                                    End Using
+                                End Sub)
+        ToggleBusyState(False)
     End Sub
 
-    Private Sub DecBenchButton_Click(sender As Object, e As EventArgs) Handles DecBenchButton.Click
-        RunBenchmark("Image Files|*.dds", Sub(FileName)
-                                              Using Decoder As New DDS_Decoder(FileName)
-                                                  Decoder.BeginDecode()
-                                              End Using
-                                          End Sub)
+    Private Async Sub DecBenchButton_Click(sender As Object, e As EventArgs) Handles DecBenchButton.Click
+        ToggleBusyState(True)
+        Await RunBenchmarkAsync(Sub(FileName)
+                                    Using Decoder As New DDS_Decoder(FileName)
+                                        Decoder.BeginDecode()
+                                    End Using
+                                End Sub)
+        ToggleBusyState(False)
     End Sub
 
-    Private Sub RunBenchmark(Filter As String, BenchAction As Action(Of String))
-        Using OFD As New OpenFileDialog With {.Filter = Filter}
-            If OFD.ShowDialog() = DialogResult.OK Then
-                Dim BenchTimer As Stopwatch = Stopwatch.StartNew()
-                For i = 0 To 49
-                    BenchAction(OFD.FileName)
-                Next
-                BenchTimer.Stop()
-                MsgBox($"Average: {BenchTimer.ElapsedMilliseconds / 50} ms")
-            End If
-        End Using
-    End Sub
+    Private Async Function RunBenchmarkAsync(BenchAction As Action(Of String)) As Task
+        Dim BenchTimer As Stopwatch = Stopwatch.StartNew()
+        Await Task.Run(Sub()
+                           For i = 0 To 49
+                               BenchAction(FilePath)
+                           Next
+                       End Sub)
+        BenchTimer.Stop()
+        MsgBox($"Average: {BenchTimer.ElapsedMilliseconds / 50} ms")
+    End Function
 
     Private Sub CalcMetricsButton_Click(sender As Object, e As EventArgs) Handles CalcMetricsButton.Click
         If PreviewImage Is Nothing Then Return
@@ -510,6 +519,10 @@ Public Class Form1
         LoadImageButton.Enabled = Not IsBusy
         ExportImageButton.Enabled = Not IsBusy
         ExportDDSButton.Enabled = Not IsBusy
+        EncBenchButton.Enabled = DDSExportGroup.Enabled AndAlso Not IsBusy
+        DecBenchButton.Enabled = ImageExportGroup.Enabled AndAlso Not IsBusy
+        CalcMetricsButton.Enabled = Not IsBusy
+        GC.Collect()
     End Sub
 
     Private Sub DisposeCubeFaces()
