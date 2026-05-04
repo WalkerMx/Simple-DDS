@@ -460,7 +460,7 @@ Public Class DDS_Encoder
             Dim shapeIndex As Integer = shapeBits And 7
             BestIndex = ParitionMap(shapeIndex)
             If BestIndex <> -1 Then
-                If LocalMax(3) - LocalMin(3) > 0 Then
+                If LocalMax(3) - LocalMin(3) > 0 OrElse LocalMax(3) = 0 Then
                     UseMode7 = True
                 Else
                     UseMode1 = True
