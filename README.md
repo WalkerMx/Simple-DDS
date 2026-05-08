@@ -37,8 +37,8 @@ Comparison testing was done on a i9-9980HK (2019), strictly on the CPU.  Results
 ### Encoding
 | | TexInspect 4K | TexConv 4K | Delta |
 | :--- | :--- | :--- | :--- |
-| BC7 No Mips | 255.54ms | 23226.3ms | 90.8x Faster |
-| BC7 Full Mips | 423.56ms | 32747.8ms | 77.3x Faster |
+| BC7 No Mips | 322.36ms | 23226.3ms | 72.1x Faster |
+| BC7 Full Mips | 493.88ms | 32747.8ms | 66.3x Faster |
 | BC5 No Mips | 246.38ms | 215.8ms | 1.1x Slower |
 | BC5 Full Mips | 395.46ms | 513.9ms | 1.3x Faster |
 | BC3 No Mips | 252.8ms | 428.0ms | 1.7x Faster |
@@ -58,8 +58,8 @@ Comparison testing was done on a i9-9980HK (2019), strictly on the CPU.  Results
 Kodak Lossless TrueColor Image Suite SSIM Benchmark (24 Images)
 | | TexConv BC7 | TexInspect BC7 | TexConv BC3 | TexInspect BC3 |
 | :--- | :--- | :--- | :--- | :--- |
-| **Average** | 0.9909 | 0.9880 | 0.9561 | 0.9528 |
-| **Worst-Case** | 0.9862 | 0.9772 | 0.9427 | 0.9338 |
+| **Average** | 0.9909 | 0.9903 | 0.9561 | 0.9528 |
+| **Worst-Case** | 0.9862 | 0.9826 | 0.9427 | 0.9338 |
 > SSIM Reference: 1.0 = Lossless | >0.98 = Indistinguishable | >0.95 = Excellent | >0.90 = Acceptable
 
 ## CLI Usage
