@@ -863,16 +863,6 @@ Public Class DDS_Encoder
             End If
         Next
         If count = 0 Then Return
-        If count = 1 Then
-            Endpoints(epOffset + 0) = sumR >> endpointShift : Endpoints(epOffset + 1) = sumR >> endpointShift
-            Endpoints(epOffset + 2) = sumG >> endpointShift : Endpoints(epOffset + 3) = sumG >> endpointShift
-            Endpoints(epOffset + 4) = sumB >> endpointShift : Endpoints(epOffset + 5) = sumB >> endpointShift
-            Endpoints(epOffset + 6) = sumA >> endpointShift : Endpoints(epOffset + 7) = sumA >> endpointShift
-            For i As Integer = 0 To 15
-                If ((subMask >> i) And 1) = targetSubset Then indices(i) = 0
-            Next
-            Return
-        End If
         Dim invCount As Single = 1.0F / CSng(count)
         Dim meanR As Single = sumR * invCount
         Dim meanG As Single = sumG * invCount
