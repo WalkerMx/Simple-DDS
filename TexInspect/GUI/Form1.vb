@@ -33,9 +33,11 @@ Public Class Form1
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         DoubleBuffered = True
         OutputFormatComboBox.SelectedIndex = 0
+        Me.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath)
         Dim Args As String() = Environment.GetCommandLineArgs()
-        If Args.Count > 1 AndAlso Args(1) = "-h" Then
-            Options = New ParallelOptions With {.MaxDegreeOfParallelism = Environment.ProcessorCount}
+        If Not (Args.Count > 1 AndAlso Args(1) = "-h") Then
+            Options = New ParallelOptions With {.MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount - 1)}
+        Else
             Me.Text = "TexInspect - All Cores Mode"
         End If
         InitCubeVertices()

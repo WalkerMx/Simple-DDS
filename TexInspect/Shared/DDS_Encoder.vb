@@ -148,7 +148,7 @@ Public Class DDS_Encoder
         Select Case DXGIFormat
             Case &H46, &H47, &H48 ' BC1 Typeless, UNORM, SRGB
                 HasCompression = True
-                CompressionMode = 1
+                CompressionMode = If(HasAlpha, 1, 0)
                 BytesPerBlock = 8
                 FourCC = "DXT1"
                 MiscFlags2 = DynamicAlpha
@@ -391,7 +391,7 @@ Public Class DDS_Encoder
                                                               EncodeBlockBC1(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset + 8, BufferA)
                                                           Case 3 ' BC3
                                                               EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 3, Result, currentBlockOffset, BufferA)
-                                                              EncodeBlockBC1(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset + 8, BufferB)
+                                                              EncodeBlockBC1(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset + 8, BufferA)
                                                           Case 4 ' BC4
                                                               EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 2, Result, currentBlockOffset, BufferA)
                                                           Case 5 ' BC5

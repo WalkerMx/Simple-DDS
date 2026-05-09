@@ -5,7 +5,7 @@
 
 Public Module DDS_Common
 
-    Public Options As New ParallelOptions With {.MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount - 1)}
+    Public Options As New ParallelOptions With {.MaxDegreeOfParallelism = Environment.ProcessorCount}
 
     <Flags>
     Public Enum DDS_SurfaceFlags
