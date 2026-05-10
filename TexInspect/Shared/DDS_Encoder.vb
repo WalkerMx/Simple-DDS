@@ -589,15 +589,15 @@ Public Class DDS_Encoder
         Result(OutputOffset + 1) = CByte(Col0 >> 8)
         Result(OutputOffset + 2) = CByte(Col1 And &HFF)
         Result(OutputOffset + 3) = CByte(Col1 >> 8)
-        Dim R0 As Integer = (Col0 >> 11) << 3
-        Dim G0 As Integer = ((Col0 >> 5) And &H3F) << 2
-        Dim B0 As Integer = (Col0 And &H1F) << 3
-        Dim R1 As Integer = (Col1 >> 11) << 3
-        Dim G1 As Integer = ((Col1 >> 5) And &H3F) << 2
-        Dim B1 As Integer = (Col1 And &H1F) << 3
-        Dim R2 As Integer = (R0 + R1) \ 2
-        Dim G2 As Integer = (G0 + G1) \ 2
-        Dim B2 As Integer = (B0 + B1) \ 2
+        Dim R0 As Integer = (Col0 >> 8) And &HF8 : R0 = R0 Or (R0 >> 5)
+        Dim G0 As Integer = (Col0 >> 3) And &HFC : G0 = G0 Or (G0 >> 6)
+        Dim B0 As Integer = (Col0 << 3) And &HF8 : B0 = B0 Or (B0 >> 5)
+        Dim R1 As Integer = (Col1 >> 8) And &HF8 : R1 = R1 Or (R1 >> 5)
+        Dim G1 As Integer = (Col1 >> 3) And &HFC : G1 = G1 Or (G1 >> 6)
+        Dim B1 As Integer = (Col1 << 3) And &HF8 : B1 = B1 Or (B1 >> 5)
+        Dim R2 As Integer = (R0 + R1 + 1) \ 2
+        Dim G2 As Integer = (G0 + G1 + 1) \ 2
+        Dim B2 As Integer = (B0 + B1 + 1) \ 2
         Dim ColorTable As UInteger = 0
         Dim shift As Integer = 0
         For i As Integer = 0 To 15
@@ -605,19 +605,23 @@ Public Class DDS_Encoder
             If (AlphaMask And (1US << i)) <> 0 Then
                 Index = 3
             Else
-                Dim Pixel As UShort = PixelArray(i)
-                Dim PixR As Integer = (Pixel >> 11) << 3
-                Dim PixG As Integer = ((Pixel >> 5) And &H3F) << 2
-                Dim PixB As Integer = (Pixel And &H1F) << 3
+                Dim OrigPix As Integer = PixelArray(i)
+                Dim PixR As Integer = (OrigPix >> 16) And &HFF
+                Dim PixG As Integer = (OrigPix >> 8) And &HFF
+                Dim PixB As Integer = OrigPix And &HFF
                 Dim dR As Integer = PixR - R0 : Dim dG As Integer = PixG - G0 : Dim dB As Integer = PixB - B0
-                Dim minErr As Integer = (dR * dR) + (dG * dG) + (dB * dB)
+                Dim minErr As Integer = (dR * dR * 3) + (dG * dG * 4) + (dB * dB * 2)
                 Index = 0
                 dR = PixR - R1 : dG = PixG - G1 : dB = PixB - B1
-                Dim err1 As Integer = (dR * dR) + (dG * dG) + (dB * dB)
-                If err1 < minErr Then minErr = err1 : Index = 1
+                Dim err As Integer = (dR * dR * 3) + (dG * dG * 4) + (dB * dB * 2)
+                If err < minErr Then
+                    minErr = err : Index = 1
+                End If
                 dR = PixR - R2 : dG = PixG - G2 : dB = PixB - B2
-                Dim err2 As Integer = (dR * dR) + (dG * dG) + (dB * dB)
-                If err2 < minErr Then Index = 2
+                err = (dR * dR * 3) + (dG * dG * 4) + (dB * dB * 2)
+                If err < minErr Then
+                    Index = 2
+                End If
             End If
             ColorTable = ColorTable Or (Index << shift)
             shift += 2
@@ -649,23 +653,21 @@ Public Class DDS_Encoder
                 Dim g As Integer = SourceData(pixelIdx + 1)
                 Dim r As Integer = SourceData(pixelIdx + 2)
                 Dim a As Integer = SourceData(pixelIdx + 3)
-                Dim pixel565 As UShort = 0
                 Dim Lum As Integer = 0
                 If a < 128 Then
                     AlphaMask = AlphaMask Or CUShort(1 << idx)
                 Else
-                    pixel565 = CUShort(((r And &HF8) << 8) Or ((g And &HFC) << 3) Or (b >> 3))
                     Lum = (r * 77) + (g * 151) + (b * 28)
                 End If
-                PixelArray(idx) = pixel565
+                PixelArray(idx) = (r << 16) Or (g << 8) Or b
                 idx += 1
                 If Lum > MaxLum Then
                     MaxLum = Lum
-                    Col0 = pixel565
+                    Col0 = CUShort(((r And &HF8) << 8) Or ((g And &HFC) << 3) Or (b >> 3))
                 End If
                 If Lum < MinLum Then
                     MinLum = Lum
-                    Col1 = pixel565
+                    Col1 = CUShort(((r And &HF8) << 8) Or ((g And &HFC) << 3) Or (b >> 3))
                 End If
             Next
         Next
@@ -674,33 +676,33 @@ Public Class DDS_Encoder
         ElseIf Col0 = Col1 Then
             If Col0 > 0 Then Col1 -= 1US Else Col0 += 1US
         End If
-        Dim R0 As Integer = (Col0 >> 11) << 3
-        Dim G0 As Integer = ((Col0 >> 5) And &H3F) << 2
-        Dim B0 As Integer = (Col0 And &H1F) << 3
-        Dim R1 As Integer = (Col1 >> 11) << 3
-        Dim G1 As Integer = ((Col1 >> 5) And &H3F) << 2
-        Dim B1 As Integer = (Col1 And &H1F) << 3
-        Dim R2 As Integer = (2 * R0 + R1) \ 3 : Dim G2 As Integer = (2 * G0 + G1) \ 3 : Dim B2 As Integer = (2 * B0 + B1) \ 3
-        Dim R3 As Integer = (R0 + 2 * R1) \ 3 : Dim G3 As Integer = (G0 + 2 * G1) \ 3 : Dim B3 As Integer = (B0 + 2 * B1) \ 3
+        Dim R0 As Integer = (Col0 >> 8) And &HF8 : R0 = R0 Or (R0 >> 5)
+        Dim G0 As Integer = (Col0 >> 3) And &HFC : G0 = G0 Or (G0 >> 6)
+        Dim B0 As Integer = (Col0 << 3) And &HF8 : B0 = B0 Or (B0 >> 5)
+        Dim R1 As Integer = (Col1 >> 8) And &HF8 : R1 = R1 Or (R1 >> 5)
+        Dim G1 As Integer = (Col1 >> 3) And &HFC : G1 = G1 Or (G1 >> 6)
+        Dim B1 As Integer = (Col1 << 3) And &HF8 : B1 = B1 Or (B1 >> 5)
+        Dim R2 As Integer = (2 * R0 + R1 + 1) \ 3 : Dim G2 As Integer = (2 * G0 + G1 + 1) \ 3 : Dim B2 As Integer = (2 * B0 + B1 + 1) \ 3
+        Dim R3 As Integer = (R0 + 2 * R1 + 1) \ 3 : Dim G3 As Integer = (G0 + 2 * G1 + 1) \ 3 : Dim B3 As Integer = (B0 + 2 * B1 + 1) \ 3
         Dim ColorTable As UInteger = 0
         Dim shift As Integer = 0
         For i As Integer = 0 To 15
-            Dim Pixel As UShort = PixelArray(i)
-            Dim PixR As Integer = (Pixel >> 11) << 3
-            Dim PixG As Integer = ((Pixel >> 5) And &H3F) << 2
-            Dim PixB As Integer = (Pixel And &H1F) << 3
+            Dim OrigPix As Integer = PixelArray(i)
+            Dim PixR As Integer = (OrigPix >> 16) And &HFF
+            Dim PixG As Integer = (OrigPix >> 8) And &HFF
+            Dim PixB As Integer = OrigPix And &HFF
             Dim dR As Integer = PixR - R0 : Dim dG As Integer = PixG - G0 : Dim dB As Integer = PixB - B0
-            Dim minErr As Integer = (dR * dR) + (dG * dG) + (dB * dB)
+            Dim minErr As Integer = (dR * dR * 3) + (dG * dG * 4) + (dB * dB * 2)
             Dim Index As UInteger = 0
             dR = PixR - R1 : dG = PixG - G1 : dB = PixB - B1
-            Dim err1 As Integer = (dR * dR) + (dG * dG) + (dB * dB)
-            If err1 < minErr Then minErr = err1 : Index = 1
+            Dim err As Integer = (dR * dR * 3) + (dG * dG * 4) + (dB * dB * 2)
+            If err < minErr Then minErr = err : Index = 1
             dR = PixR - R2 : dG = PixG - G2 : dB = PixB - B2
-            Dim err2 As Integer = (dR * dR) + (dG * dG) + (dB * dB)
-            If err2 < minErr Then minErr = err2 : Index = 2
+            err = (dR * dR * 3) + (dG * dG * 4) + (dB * dB * 2)
+            If err < minErr Then minErr = err : Index = 2
             dR = PixR - R3 : dG = PixG - G3 : dB = PixB - B3
-            Dim err3 As Integer = (dR * dR) + (dG * dG) + (dB * dB)
-            If err3 < minErr Then Index = 3
+            err = (dR * dR * 3) + (dG * dG * 4) + (dB * dB * 2)
+            If err < minErr Then Index = 3
             ColorTable = ColorTable Or (Index << shift)
             shift += 2
         Next
