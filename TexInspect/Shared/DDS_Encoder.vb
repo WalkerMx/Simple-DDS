@@ -537,12 +537,19 @@ Public Class DDS_Encoder
         For i As Integer = 0 To 15
             Dim v As Integer = ChannelArray(i)
             Dim Index As Byte
-            If v = Val0 Then
+            If v >= Val0 Then
                 Index = 0
-            ElseIf v = Val1 Then
+            ElseIf v <= Val1 Then
                 Index = 1
             Else
-                Index = CByte(Math.Max(2, Math.Min(7 - ((CInt(v) - Val1) * 7 \ Range), 7)))
+                Dim stepCount As Integer = ((CInt(Val0) - v) * 7 + (Range \ 2)) \ Range
+                If stepCount <= 0 Then
+                    Index = 0
+                ElseIf stepCount >= 7 Then
+                    Index = 1
+                Else
+                    Index = CByte(stepCount + 1)
+                End If
             End If
             BitBuffer = BitBuffer Or (CLng(Index) << BitsLoaded)
             BitsLoaded += 3
@@ -563,10 +570,10 @@ Public Class DDS_Encoder
             For i As Integer = 0 To 3 Step 2
                 Dim px0 As Integer = Math.Min(xPixelBase + i, Width - 1)
                 Dim alpha0 As Byte = SourceData(rowInputOffset + (px0 * 4) + 3)
-                Dim nibble0 As Byte = CByte(alpha0 >> 4)
+                Dim nibble0 As Byte = CByte((CInt(alpha0) + 8) \ 17)
                 Dim px1 As Integer = Math.Min(xPixelBase + i + 1, Width - 1)
                 Dim alpha1 As Byte = SourceData(rowInputOffset + (px1 * 4) + 3)
-                Dim nibble1 As Byte = CByte(alpha1 >> 4)
+                Dim nibble1 As Byte = CByte((CInt(alpha1) + 8) \ 17)
                 Result(OutputOffset + byteIdx) = CByte(nibble0 Or (nibble1 << 4))
                 byteIdx += 1
             Next

@@ -31,9 +31,10 @@ Public Class Form1
     End Class
 
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-        DoubleBuffered = True
-        OutputFormatComboBox.SelectedIndex = 0
+        Me.DoubleBuffered = True
+        Me.AllowDrop = True
         Me.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath)
+        OutputFormatComboBox.SelectedIndex = 0
         Dim Args As String() = Environment.GetCommandLineArgs()
         If Not (Args.Count > 1 AndAlso Args(1) = "-h") Then
             Options = New ParallelOptions With {.MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount - 1)}
@@ -41,6 +42,30 @@ Public Class Form1
             Me.Text = "TexInspect - All Cores Mode"
         End If
         InitCubeVertices()
+    End Sub
+
+    Private Sub Form1_DragEnter(sender As Object, e As DragEventArgs) Handles Me.DragEnter
+        If e.Data.GetDataPresent(DataFormats.FileDrop) Then
+            e.Effect = DragDropEffects.Copy
+        Else
+            e.Effect = DragDropEffects.None
+        End If
+    End Sub
+
+    Private Async Sub Form1_DragDrop(sender As Object, e As DragEventArgs) Handles Me.DragDrop
+        Try
+            Dim files() As String = DirectCast(e.Data.GetData(DataFormats.FileDrop), String())
+            If files.Length > 0 Then
+                Dim FileExt As String = Path.GetExtension(files(0)).ToLower
+                If {".dds", ".png", ".jpg", ".jpeg", ".bmp"}.Contains(FileExt) Then
+                    Await ProcessLoadedFileAsync(files(0))
+                Else
+                    MessageBox.Show($"Invalid format: {FileExt}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                End If
+            End If
+        Catch ex As Exception
+            MessageBox.Show("Error loading file: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation)
+        End Try
     End Sub
 
     Private Sub Form1_Closing(sender As Object, e As EventArgs) Handles MyBase.Closing
