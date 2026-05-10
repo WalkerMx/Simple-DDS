@@ -58,8 +58,8 @@ Comparison testing was done on a i9-9980HK (2019), strictly on the CPU.  Results
 Kodak Lossless TrueColor Image Suite SSIM Benchmark (24 Images)
 | | TexConv BC7 | TexInspect BC7 | TexConv BC3 | TexInspect BC3 |
 | :--- | :--- | :--- | :--- | :--- |
-| **Average** | 0.9909 | 0.9903 | 0.9561 | 0.9580 |
-| **Worst-Case** | 0.9862 | 0.9826 | 0.9427 | 0.9398 |
+| **Average** | 0.9909 | 0.9903 | 0.9608 | 0.9580 |
+| **Worst-Case** | 0.9862 | 0.9826 | 0.9476 | 0.9398 |
 > SSIM Reference: 1.0 = Lossless | >0.98 = Indistinguishable | >0.95 = Excellent | >0.90 = Acceptable
 
 ## CLI Usage
