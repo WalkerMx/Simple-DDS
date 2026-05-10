@@ -37,22 +37,22 @@ Comparison testing was done on a i9-9980HK (2019), strictly on the CPU.  Results
 ### Encoding
 | | TexInspect 4K | TexConv 4K | Delta |
 | :--- | :--- | :--- | :--- |
-| BC7 No Mips | 322.36ms | 23226.3ms | 72.1x Faster |
-| BC7 Full Mips | 493.88ms | 32747.8ms | 66.3x Faster |
-| BC5 No Mips | 246.38ms | 215.8ms | 1.1x Slower |
-| BC5 Full Mips | 395.46ms | 513.9ms | 1.3x Faster |
-| BC3 No Mips | 252.8ms | 428.0ms | 1.7x Faster |
-| BC3 Full Mips | 406.38ms | 790.5ms | 1.9x Faster |
-| BC1 No Mips | 234.28ms | 409.6ms | 1.7x Faster |
-| BC1 Full Mips | 361.72ms | 766.7ms | 2.1x Faster |
+| BC7 No Mips | 272.86ms | 23226.3ms | 85.1x Faster |
+| BC7 Full Mips | 402.3ms | 32747.8ms | 81.4x Faster |
+| BC5 No Mips | 233.56ms | 215.8ms | 1.08x Slower |
+| BC5 Full Mips | 345.28ms | 513.9ms | 1.5x Faster |
+| BC3 No Mips | 238.5ms | 428.0ms | 1.8x Faster |
+| BC3 Full Mips | 349.2ms | 790.5ms | 2.3x Faster |
+| BC1 No Mips | 226.26ms | 409.6ms | 1.8x Faster |
+| BC1 Full Mips | 305.74ms | 766.7ms | 2.5x Faster |
 
 ### Decoding
 | | TexInspect 4K | TexConv 4K | Delta |
 | :--- | :--- | :--- | :--- |
-| BC7 | 77.78ms | 1600.1ms | 20.6x Faster |
-| BC5 | 69.76ms | 423.3ms | 6.1x Faster |
-| BC3 | 81.84ms | 1380.4ms | 16.9x Faster |
-| BC1 | 62.62ms | 1354.0ms | 21.6x Faster |
+| BC7 | 66.28ms | 1600.1ms | 24.1x Faster |
+| BC5 | 51.88ms | 423.3ms | 8.2x Faster |
+| BC3 | 56.76ms | 1380.4ms | 24.3x Faster |
+| BC1 | 40.02ms | 1354.0ms | 33.8x Faster |
 
 ## Quality
 Kodak Lossless TrueColor Image Suite SSIM Benchmark (24 Images)
