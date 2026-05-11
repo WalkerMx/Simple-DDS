@@ -41,6 +41,7 @@ Public Class Form1
         Else
             Me.Text = "TexInspect - All Cores Mode"
         End If
+        PreviewPictureBox.Image = GeneratePlaceholderImage()
         InitCubeVertices()
     End Sub
 
@@ -532,6 +533,30 @@ Public Class Form1
             End Using
         End Using
         Return TempImage
+    End Function
+
+    Private Function GeneratePlaceholderImage(Optional Width As Integer = 400, Optional Height As Integer = 400) As Bitmap
+        Dim ResultBitmap As New Bitmap(Width, Height)
+        Using g As Graphics = Graphics.FromImage(ResultBitmap)
+            g.SmoothingMode = SmoothingMode.AntiAlias
+            g.TextRenderingHint = Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            g.Clear(SystemColors.Control)
+            Dim HintText As String = "Load or drag an image to begin."
+            Dim HintSymbol As String = "⇓"
+            Using TextFont As New Font("Segoe UI", 16, FontStyle.Regular)
+                Using SymbolFont As New Font("Segoe UI", 48, FontStyle.Regular)
+                    Dim TextSize As SizeF = g.MeasureString(HintText, TextFont)
+                    Dim SymbolSize As SizeF = g.MeasureString(HintSymbol, SymbolFont)
+                    Dim TextX As Single = (Width - TextSize.Width) / 2
+                    Dim TextY As Single = (Height - (TextSize.Height + SymbolSize.Height)) / 2
+                    Dim SymbolX As Single = (Width - SymbolSize.Width) / 2
+                    Dim SymbolY As Single = TextY + TextSize.Height + 5
+                    g.DrawString(HintText, TextFont, SystemBrushes.ControlDark, TextX, TextY)
+                    g.DrawString(HintSymbol, SymbolFont, SystemBrushes.ControlDark, SymbolX, SymbolY)
+                End Using
+            End Using
+        End Using
+        Return ResultBitmap
     End Function
 
     Private Function GetBounds(Source As String) As Integer()

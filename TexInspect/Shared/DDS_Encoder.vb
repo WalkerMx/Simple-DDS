@@ -484,22 +484,23 @@ Public Class DDS_Encoder
                 End If
             End If
         End If
+        Dim PBits As Integer = 0
         If UseMode7 Then
             Dim subMask = PartitionTable2(BestIndex)
-            GetEndpointsPCA(subMask, 0, LocalR, LocalG, LocalB, LocalA, 3, 3, 1, Endpoints, 0, Indicies)
-            GetEndpointsPCA(subMask, 1, LocalR, LocalG, LocalB, LocalA, 3, 3, 1, Endpoints, 8, Indicies)
-            EncodeMode7(BestIndex, Endpoints, Indicies, Result, OutputOffset)
+            GetEndpointsPCA(subMask, 0, LocalR, LocalG, LocalB, LocalA, 3, 3, 1, Endpoints, 0, Indicies, PBits)
+            GetEndpointsPCA(subMask, 1, LocalR, LocalG, LocalB, LocalA, 3, 3, 1, Endpoints, 8, Indicies, PBits)
+            EncodeMode7(BestIndex, Endpoints, Indicies, Result, OutputOffset, PBits)
             Return
         End If
         If UseMode1 Then
             Dim subMask = PartitionTable2(BestIndex)
-            GetEndpointsPCA(subMask, 0, LocalR, LocalG, LocalB, LocalA, 2, 7, 0, Endpoints, 0, Indicies)
-            GetEndpointsPCA(subMask, 1, LocalR, LocalG, LocalB, LocalA, 2, 7, 0, Endpoints, 8, Indicies)
-            EncodeMode1(BestIndex, Endpoints, Indicies, Result, OutputOffset)
+            GetEndpointsPCA(subMask, 0, LocalR, LocalG, LocalB, LocalA, 2, 7, 0, Endpoints, 0, Indicies, PBits)
+            GetEndpointsPCA(subMask, 1, LocalR, LocalG, LocalB, LocalA, 2, 7, 0, Endpoints, 8, Indicies, PBits)
+            EncodeMode1(BestIndex, Endpoints, Indicies, Result, OutputOffset, PBits)
             Return
         End If
-        GetEndpointsPCA(0, 0, LocalR, LocalG, LocalB, LocalA, 1, 15, 1, Endpoints, 0, Indicies)
-        EncodeMode6(Endpoints, Indicies, Result, OutputOffset)
+        GetEndpointsPCA(0, 0, LocalR, LocalG, LocalB, LocalA, 1, 15, 1, Endpoints, 0, Indicies, PBits)
+        EncodeMode6(Endpoints, Indicies, Result, OutputOffset, PBits)
     End Sub
 
     Private Sub EncodeBlockBC3(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, ChannelOffset As Integer, Result As Byte(), OutputOffset As Integer, ChannelArray() As Integer)
@@ -718,7 +719,7 @@ Public Class DDS_Encoder
 
 #Region "BC7 Modes"
 
-    Private Sub EncodeMode7(PartitionID As Integer, Endpoints() As Integer, Indices() As Integer, Result As Byte(), OutputOffset As Integer)
+    Private Sub EncodeMode7(PartitionID As Integer, Endpoints() As Integer, Indices() As Integer, Result As Byte(), OutputOffset As Integer, PBits As Integer)
         Dim subMask = PartitionTable2(PartitionID)
         Dim anchor0 As Integer = 0
         Dim anchor1 As Integer = AnchorIndexTable2(PartitionID)
@@ -759,6 +760,10 @@ Public Class DDS_Encoder
         High1 = High1 Or (CULng(Endpoints(7)) << 15)
         High1 = High1 Or (CULng(Endpoints(14)) << 20)
         High1 = High1 Or (CULng(Endpoints(15)) << 25)
+        High1 = High1 Or (CULng(PBits And &H8) << 27)
+        High1 = High1 Or (CULng(PBits And &H4) << 29)
+        High1 = High1 Or (CULng(PBits And &H2) << 31)
+        High1 = High1 Or (CULng(PBits And &H1) << 33)
         Dim bitOffset As Integer = 34
         For i = 0 To 15
             Dim bits As Integer = If(i = anchor0 OrElse i = anchor1, 1, 2)
@@ -771,7 +776,7 @@ Public Class DDS_Encoder
         Next
     End Sub
 
-    Private Sub EncodeMode6(Endpoints() As Integer, Indices() As Integer, Result As Byte(), OutputOffset As Integer)
+    Private Sub EncodeMode6(Endpoints() As Integer, Indices() As Integer, Result As Byte(), OutputOffset As Integer, PBits As Integer)
         If Indices(0) >= 8 Then
             Dim t As Integer
             t = Endpoints(0) : Endpoints(0) = Endpoints(1) : Endpoints(1) = t
@@ -791,8 +796,8 @@ Public Class DDS_Encoder
         LowBytes = LowBytes Or (CULng(Endpoints(5)) << 42)
         LowBytes = LowBytes Or (CULng(Endpoints(6)) << 49)
         LowBytes = LowBytes Or (CULng(Endpoints(7)) << 56)
-        LowBytes = LowBytes Or (1UL << 63)
-        Dim HighBytes As ULong = 1UL
+        LowBytes = LowBytes Or (CULng(PBits And &H2) << 62)
+        Dim HighBytes As ULong = CULng(PBits And &H1)
         HighBytes = HighBytes Or ((CULng(Indices(0)) And 7UL) << 1)
         For i As Integer = 1 To 15
             HighBytes = HighBytes Or ((CULng(Indices(i)) And 15UL) << (i * 4))
@@ -803,7 +808,7 @@ Public Class DDS_Encoder
         Next
     End Sub
 
-    Private Sub EncodeMode1(PartitionID As Integer, Endpoints() As Integer, Indices() As Integer, Result As Byte(), OutputOffset As Integer)
+    Private Sub EncodeMode1(PartitionID As Integer, Endpoints() As Integer, Indices() As Integer, Result As Byte(), OutputOffset As Integer, PBits As Integer)
         Dim subMask = PartitionTable2(PartitionID)
         Dim anchor0 As Integer = 0
         Dim anchor1 As Integer = AnchorIndexTable2(PartitionID)
@@ -839,6 +844,8 @@ Public Class DDS_Encoder
         Dim High1 As ULong = ((CULng(Endpoints(5)) >> 2) And 15UL)
         High1 = High1 Or (CULng(Endpoints(12)) << 4)
         High1 = High1 Or (CULng(Endpoints(13)) << 10)
+        High1 = High1 Or (CULng(PBits And &H8) << 13)
+        High1 = High1 Or (CULng(PBits And &H2) << 16)
         Dim bitOffset As Integer = 18
         For i = 0 To 15
             Dim bits As Integer = If(i = anchor0 OrElse i = anchor1, 2, 3)
@@ -851,7 +858,7 @@ Public Class DDS_Encoder
         Next
     End Sub
 
-    Private Sub GetEndpointsPCA(subMask As Integer, targetSubset As Integer, LocalR() As Integer, LocalG() As Integer, LocalB() As Integer, LocalA() As Integer, endpointShift As Integer, indexMax As Integer, alphaMult As Integer, Endpoints() As Integer, epOffset As Integer, indices() As Integer)
+    Private Sub GetEndpointsPCA(subMask As Integer, targetSubset As Integer, LocalR() As Integer, LocalG() As Integer, LocalB() As Integer, LocalA() As Integer, endpointShift As Integer, indexMax As Integer, alphaMult As Integer, Endpoints() As Integer, epOffset As Integer, indices() As Integer, ByRef PBits As Integer)
         Dim count As Integer = 0
         Dim sumR As Integer = 0, sumG As Integer = 0, sumB As Integer = 0, sumA As Integer = 0
         Dim sumRR As Integer = 0, sumGG As Integer = 0, sumBB As Integer = 0, sumAA As Integer = 0
@@ -864,12 +871,12 @@ Public Class DDS_Encoder
                 Dim b As Integer = LocalB(i)
                 Dim a As Integer = LocalA(i) * alphaMult
                 sumR += r : sumG += g : sumB += b : sumA += a
-                sumRR += r * r : sumGG += g * g : sumBB += b * b : sumAA += a * a
-                sumRG += r * g : sumRB += r * b : sumRA += r * a
-                sumGB += g * b : sumGA += g * a
-                sumBA += b * a
-                count += 1
-            End If
+                    sumRR += r * r : sumGG += g * g : sumBB += b * b : sumAA += a * a
+                    sumRG += r * g : sumRB += r * b : sumRA += r * a
+                    sumGB += g * b : sumGA += g * a
+                    sumBA += b * a
+                    count += 1
+                End If
         Next
         If count = 0 Then Return
         Dim invCount As Single = 1.0F / CSng(count)
@@ -928,6 +935,22 @@ Public Class DDS_Encoder
         If ep0A < 0 Then ep0A = 0 Else If ep0A > 255 Then ep0A = 255
         Dim ep1A As Integer = CInt(meanA + vA * maxProj)
         If ep1A < 0 Then ep1A = 0 Else If ep1A > 255 Then ep1A = 255
+        Dim p0, p1 As Integer
+        If ep0G = 0 Then
+            p0 = 0
+        ElseIf ep0g = 255 Then
+            p0 = 1
+        Else
+            p0 = (ep0G >> (endpointShift - 1)) And 1
+        End If
+        If ep1G = 0 Then
+            p1 = 0
+        ElseIf ep1g = 255 Then
+            p1 = 1
+        Else
+            p1 = (ep1G >> (endpointShift - 1)) And 1
+        End If
+        PBits = (PBits << 2) Or (p0 << 1) Or p1
         Endpoints(epOffset + 0) = ep0R >> endpointShift : Endpoints(epOffset + 1) = ep1R >> endpointShift
         Endpoints(epOffset + 2) = ep0G >> endpointShift : Endpoints(epOffset + 3) = ep1G >> endpointShift
         Endpoints(epOffset + 4) = ep0B >> endpointShift : Endpoints(epOffset + 5) = ep1B >> endpointShift
