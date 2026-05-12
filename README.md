@@ -55,8 +55,20 @@ Comparison testing was done on a i9-9980HK (2019), strictly on the CPU.  Results
 | BC1 | 40.02ms | 1354.0ms | 33.8x Faster |
 
 ## Quality
-Kodak Lossless TrueColor Image Suite SSIM Benchmark (24 Images)
-| | TexConv BC7 | TexInspect BC7 | TexConv BC3 | TexInspect BC3 |
+Kodak Lossless TrueColor Image Suite Benchmarks (24 Images)
+| MSE | TexConv BC7 | TexInspect BC7 | TexConv BC3 | TexInspect BC3 |
+| :--- | :--- | :--- | :--- | :--- |
+| **Average** | 4.6653 | 4.4707 | 21.1078 | 31.0008 |
+| **Worst-Case** | 10.1183 | 9.0946 | 47.2959 | 71.734 |
+> MSE Reference: 0 = Lossless | <2 = Indistinguishable | <20 = Excellent | <65 = Acceptable
+
+| PSNR | TexConv BC7 | TexInspect BC7 | TexConv BC3 | TexInspect BC3 |
+| :--- | :--- | :--- | :--- | :--- |
+| **Average** | 41.9745 dB | 42.0644 dB | 35.3033 dB | 33.7313 dB |
+| **Worst-Case** | 38.0797 dB | 38.543 dB | 31.3826 dB | 29.5736 dB |
+> PSNR Reference: 128 = Lossless | >45 dB = Indistinguishable | >35 dB = Excellent | >30 dB = Acceptable
+
+| SSIM | TexConv BC7 | TexInspect BC7 | TexConv BC3 | TexInspect BC3 |
 | :--- | :--- | :--- | :--- | :--- |
 | **Average** | 0.9909 | 0.9903 | 0.9608 | 0.9580 |
 | **Worst-Case** | 0.9862 | 0.9826 | 0.9476 | 0.9398 |
