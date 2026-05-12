@@ -742,37 +742,37 @@ Public Class DDS_Encoder
                 If ((subMask >> i) And 1) = 1 Then Indices(i) = 3 - Indices(i)
             Next
         End If
-        Dim Low1 As ULong = 128UL
-        Low1 = Low1 Or (CULng(PartitionID) << 8)
-        Low1 = Low1 Or (CULng(Endpoints(0)) << 14)
-        Low1 = Low1 Or (CULng(Endpoints(1)) << 19)
-        Low1 = Low1 Or (CULng(Endpoints(8)) << 24)
-        Low1 = Low1 Or (CULng(Endpoints(9)) << 29)
-        Low1 = Low1 Or (CULng(Endpoints(2)) << 34)
-        Low1 = Low1 Or (CULng(Endpoints(3)) << 39)
-        Low1 = Low1 Or (CULng(Endpoints(10)) << 44)
-        Low1 = Low1 Or (CULng(Endpoints(11)) << 49)
-        Low1 = Low1 Or (CULng(Endpoints(4)) << 54)
-        Low1 = Low1 Or (CULng(Endpoints(5)) << 59)
-        Dim High1 As ULong = CULng(Endpoints(12))
-        High1 = High1 Or (CULng(Endpoints(13)) << 5)
-        High1 = High1 Or (CULng(Endpoints(6)) << 10)
-        High1 = High1 Or (CULng(Endpoints(7)) << 15)
-        High1 = High1 Or (CULng(Endpoints(14)) << 20)
-        High1 = High1 Or (CULng(Endpoints(15)) << 25)
-        High1 = High1 Or (CULng(PBits And &H8) << 27)
-        High1 = High1 Or (CULng(PBits And &H4) << 29)
-        High1 = High1 Or (CULng(PBits And &H2) << 31)
-        High1 = High1 Or (CULng(PBits And &H1) << 33)
+        Dim LowBytes As ULong = 128UL
+        LowBytes = LowBytes Or (CULng(PartitionID) << 8)
+        LowBytes = LowBytes Or (CULng(Endpoints(0)) << 14)
+        LowBytes = LowBytes Or (CULng(Endpoints(1)) << 19)
+        LowBytes = LowBytes Or (CULng(Endpoints(8)) << 24)
+        LowBytes = LowBytes Or (CULng(Endpoints(9)) << 29)
+        LowBytes = LowBytes Or (CULng(Endpoints(2)) << 34)
+        LowBytes = LowBytes Or (CULng(Endpoints(3)) << 39)
+        LowBytes = LowBytes Or (CULng(Endpoints(10)) << 44)
+        LowBytes = LowBytes Or (CULng(Endpoints(11)) << 49)
+        LowBytes = LowBytes Or (CULng(Endpoints(4)) << 54)
+        LowBytes = LowBytes Or (CULng(Endpoints(5)) << 59)
+        Dim HighBytes As ULong = CULng(Endpoints(12))
+        HighBytes = HighBytes Or (CULng(Endpoints(13)) << 5)
+        HighBytes = HighBytes Or (CULng(Endpoints(6)) << 10)
+        HighBytes = HighBytes Or (CULng(Endpoints(7)) << 15)
+        HighBytes = HighBytes Or (CULng(Endpoints(14)) << 20)
+        HighBytes = HighBytes Or (CULng(Endpoints(15)) << 25)
+        HighBytes = HighBytes Or (CULng(PBits And &H8) << 27)
+        HighBytes = HighBytes Or (CULng(PBits And &H4) << 29)
+        HighBytes = HighBytes Or (CULng(PBits And &H2) << 31)
+        HighBytes = HighBytes Or (CULng(PBits And &H1) << 33)
         Dim bitOffset As Integer = 34
         For i = 0 To 15
             Dim bits As Integer = If(i = anchor0 OrElse i = anchor1, 1, 2)
-            High1 = High1 Or (CULng(Indices(i)) << bitOffset)
+            HighBytes = HighBytes Or (CULng(Indices(i)) << bitOffset)
             bitOffset += bits
         Next
         For i As Integer = 0 To 7
-            Result(OutputOffset + i) = CByte((Low1 >> (i << 3)) And &HFFUL)
-            Result(OutputOffset + 8 + i) = CByte((High1 >> (i << 3)) And &HFFUL)
+            Result(OutputOffset + i) = CByte((LowBytes >> (i << 3)) And &HFFUL)
+            Result(OutputOffset + 8 + i) = CByte((HighBytes >> (i << 3)) And &HFFUL)
         Next
     End Sub
 
@@ -829,32 +829,32 @@ Public Class DDS_Encoder
                 If ((subMask >> i) And 1) = 1 Then Indices(i) = 7 - Indices(i)
             Next
         End If
-        Dim Low1 As ULong = 2UL
-        Low1 = Low1 Or (CULng(PartitionID) << 2)
-        Low1 = Low1 Or (CULng(Endpoints(0)) << 8)
-        Low1 = Low1 Or (CULng(Endpoints(1)) << 14)
-        Low1 = Low1 Or (CULng(Endpoints(8)) << 20)
-        Low1 = Low1 Or (CULng(Endpoints(9)) << 26)
-        Low1 = Low1 Or (CULng(Endpoints(2)) << 32)
-        Low1 = Low1 Or (CULng(Endpoints(3)) << 38)
-        Low1 = Low1 Or (CULng(Endpoints(10)) << 44)
-        Low1 = Low1 Or (CULng(Endpoints(11)) << 50)
-        Low1 = Low1 Or (CULng(Endpoints(4)) << 56)
-        Low1 = Low1 Or ((CULng(Endpoints(5)) And 3UL) << 62)
-        Dim High1 As ULong = ((CULng(Endpoints(5)) >> 2) And 15UL)
-        High1 = High1 Or (CULng(Endpoints(12)) << 4)
-        High1 = High1 Or (CULng(Endpoints(13)) << 10)
-        High1 = High1 Or (CULng(PBits And &H8) << 13)
-        High1 = High1 Or (CULng(PBits And &H2) << 16)
+        Dim LowBytes As ULong = 2UL
+        LowBytes = LowBytes Or (CULng(PartitionID) << 2)
+        LowBytes = LowBytes Or (CULng(Endpoints(0)) << 8)
+        LowBytes = LowBytes Or (CULng(Endpoints(1)) << 14)
+        LowBytes = LowBytes Or (CULng(Endpoints(8)) << 20)
+        LowBytes = LowBytes Or (CULng(Endpoints(9)) << 26)
+        LowBytes = LowBytes Or (CULng(Endpoints(2)) << 32)
+        LowBytes = LowBytes Or (CULng(Endpoints(3)) << 38)
+        LowBytes = LowBytes Or (CULng(Endpoints(10)) << 44)
+        LowBytes = LowBytes Or (CULng(Endpoints(11)) << 50)
+        LowBytes = LowBytes Or (CULng(Endpoints(4)) << 56)
+        LowBytes = LowBytes Or ((CULng(Endpoints(5)) And 3UL) << 62)
+        Dim HighBytes As ULong = ((CULng(Endpoints(5)) >> 2) And 15UL)
+        HighBytes = HighBytes Or (CULng(Endpoints(12)) << 4)
+        HighBytes = HighBytes Or (CULng(Endpoints(13)) << 10)
+        HighBytes = HighBytes Or (CULng(PBits And &H8) << 13)
+        HighBytes = HighBytes Or (CULng(PBits And &H2) << 16)
         Dim bitOffset As Integer = 18
         For i = 0 To 15
             Dim bits As Integer = If(i = anchor0 OrElse i = anchor1, 2, 3)
-            High1 = High1 Or (CULng(Indices(i)) << bitOffset)
+            HighBytes = HighBytes Or (CULng(Indices(i)) << bitOffset)
             bitOffset += bits
         Next
         For i As Integer = 0 To 7
-            Result(OutputOffset + i) = CByte((Low1 >> (i << 3)) And &HFFUL)
-            Result(OutputOffset + 8 + i) = CByte((High1 >> (i << 3)) And &HFFUL)
+            Result(OutputOffset + i) = CByte((LowBytes >> (i << 3)) And &HFFUL)
+            Result(OutputOffset + 8 + i) = CByte((HighBytes >> (i << 3)) And &HFFUL)
         Next
     End Sub
 
@@ -935,21 +935,8 @@ Public Class DDS_Encoder
         If ep0A < 0 Then ep0A = 0 Else If ep0A > 255 Then ep0A = 255
         Dim ep1A As Integer = CInt(meanA + vA * maxProj)
         If ep1A < 0 Then ep1A = 0 Else If ep1A > 255 Then ep1A = 255
-        Dim p0, p1 As Integer
-        If ep0G = 0 Then
-            p0 = 0
-        ElseIf ep0g = 255 Then
-            p0 = 1
-        Else
-            p0 = (ep0G >> (endpointShift - 1)) And 1
-        End If
-        If ep1G = 0 Then
-            p1 = 0
-        ElseIf ep1g = 255 Then
-            p1 = 1
-        Else
-            p1 = (ep1G >> (endpointShift - 1)) And 1
-        End If
+        Dim p0 As Integer = (ep0G >> (endpointShift - 1)) And 1
+        Dim p1 As Integer = (ep1G >> (endpointShift - 1)) And 1
         PBits = (PBits << 2) Or (p0 << 1) Or p1
         Endpoints(epOffset + 0) = ep0R >> endpointShift : Endpoints(epOffset + 1) = ep1R >> endpointShift
         Endpoints(epOffset + 2) = ep0G >> endpointShift : Endpoints(epOffset + 3) = ep1G >> endpointShift
