@@ -110,13 +110,20 @@ Public Module DDS_Common
         D3D10_RESOURCE_MISC_TEXTURECUBE = &H4
     End Enum
 
-    <Flags>
     Public Enum DX10_MiscFlags2 As Integer
         DDS_ALPHA_MODE_UNKNOWN = &H0
         DDS_ALPHA_MODE_STRAIGHT = &H1
         DDS_ALPHA_MODE_PREMULTIPLIED = &H2
         DDS_ALPHA_MODE_OPAQUE = &H3
         DDS_ALPHA_MODE_CUSTOM = &H4
+    End Enum
+
+    Public Enum DDS_SpecialFlags As Integer
+        DDS_DXT1o = &H1
+        DDS_DXT2 = &H2
+        DDS_DXT4 = &H3
+        DDS_DXT5n = &H4
+        DDS_DXT7n = &H5
     End Enum
 
     ' BC7 Mode 1/7 Heuristic Tables

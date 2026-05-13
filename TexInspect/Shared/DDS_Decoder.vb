@@ -42,9 +42,11 @@ Public Class DDS_Decoder
     Public MiscFlags2 As DX10_MiscFlags2
 
     Public IsCubeMap As Boolean
+    Public IsNormalMap As Boolean
     Public ExtendedHeader As Boolean
 
     Private CubeFaces(5)() As Byte
+    Private OutputPixelFormat As PixelFormat = PixelFormat.Format32bppArgb
 
     Private FilePath As String
     Private SourceBytes As Byte()
@@ -60,6 +62,7 @@ Public Class DDS_Decoder
 
     Public Sub New(Source As String)
         FilePath = Source
+        If FilePath.ToLower.Contains("_n.dds") Then IsNormalMap = True
         ReadHeader(Source)
     End Sub
 
@@ -120,26 +123,27 @@ Public Class DDS_Decoder
         Dim AlphaMode As Integer = 0
         Dim CompressionMode As Integer = 0
         Dim BytesToRead As Integer = 0
+        Dim BaseBytes As Integer = Math.Max(1, (Me.Width + 3) \ 4) * Math.Max(1, (Me.Height + 3) \ 4)
         If ExtendedHeader Then
             Select Case DXGIFormat
                 Case &H46, &H47, &H48 ' BC1 Typeless, UNORM, SRGB
                     CompressionMode = If(MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_OPAQUE, 0, 1)
-                    BytesToRead = Math.Max(1, (Me.Width + 3) \ 4) * Math.Max(1, (Me.Height + 3) \ 4) * 8
+                    BytesToRead = BaseBytes * 8
                 Case &H49, &H4A, &H4B ' BC2 Typeless, UNORM, SRGB
                     CompressionMode = 2
-                    BytesToRead = Math.Max(1, (Me.Width + 3) \ 4) * Math.Max(1, (Me.Height + 3) \ 4) * 16
+                    BytesToRead = BaseBytes * 16
                 Case &H4C, &H4D, &H4E ' BC3 Typeless, UNORM, SRGB
-                    CompressionMode = 3
-                    BytesToRead = Math.Max(1, (Me.Width + 3) \ 4) * Math.Max(1, (Me.Height + 3) \ 4) * 16
+                    CompressionMode = If(IsNormalMap, 30, 3)
+                    BytesToRead = BaseBytes * 16
                 Case &H4F, &H50 ' BC4 Typeless, UNORM
                     CompressionMode = 4
-                    BytesToRead = Math.Max(1, (Me.Width + 3) \ 4) * Math.Max(1, (Me.Height + 3) \ 4) * 8
+                    BytesToRead = BaseBytes * 8
                 Case &H52, &H53 ' BC5 Typeless, UNORM
                     CompressionMode = 5
-                    BytesToRead = Math.Max(1, (Me.Width + 3) \ 4) * Math.Max(1, (Me.Height + 3) \ 4) * 16
+                    BytesToRead = BaseBytes * 16
                 Case &H61, &H62, &H63 ' BC7 Typeless, UNORM, SRGB
                     CompressionMode = 7
-                    BytesToRead = Math.Max(1, (Me.Width + 3) \ 4) * Math.Max(1, (Me.Height + 3) \ 4) * 16
+                    BytesToRead = BaseBytes * 16
                 Case &H57, &H5A, &H5B ' B8G8R8A8 Typeless, UNORM, SRGB
                     CompressionMode = -1
                     AlphaMode = 2
@@ -151,24 +155,35 @@ Public Class DDS_Decoder
                 Case Else
                     Throw New Exception("Unsupported DXGI Format: " & DXGIFormat.ToString.Replace("DXGI_FORMAT_", ""))
             End Select
+            If MiscFlags2 = DX10_MiscFlags2.DDS_ALPHA_MODE_PREMULTIPLIED Then
+                OutputPixelFormat = PixelFormat.Format32bppPArgb
+            End If
         Else
             If (PixelFlags And DDS_PixelFlags.DDPF_FOURCC) = DDS_PixelFlags.DDPF_FOURCC Then
                 Select Case FourCC
                     Case "DXT1"
                         CompressionMode = If((PixelFlags And DDS_PixelFlags.DDPF_ALPHAPIXELS) = DDS_PixelFlags.DDPF_ALPHAPIXELS, 1, 0)
-                        BytesToRead = Math.Max(1, (Me.Width + 3) \ 4) * Math.Max(1, (Me.Height + 3) \ 4) * 8
+                        BytesToRead = BaseBytes * 8
+                    Case "DXT2"
+                        CompressionMode = 2
+                        BytesToRead = BaseBytes * 16
+                        OutputPixelFormat = PixelFormat.Format32bppPArgb
                     Case "DXT3"
                         CompressionMode = 2
-                        BytesToRead = Math.Max(1, (Me.Width + 3) \ 4) * Math.Max(1, (Me.Height + 3) \ 4) * 16
+                        BytesToRead = BaseBytes * 16
+                    Case "DXT4"
+                        CompressionMode = 3
+                        BytesToRead = BaseBytes * 16
+                        OutputPixelFormat = PixelFormat.Format32bppPArgb
                     Case "DXT5"
                         CompressionMode = 3
-                        BytesToRead = Math.Max(1, (Me.Width + 3) \ 4) * Math.Max(1, (Me.Height + 3) \ 4) * 16
+                        BytesToRead = BaseBytes * 16
                     Case "ATI1", "BC4U"
                         CompressionMode = 4
-                        BytesToRead = Math.Max(1, (Me.Width + 3) \ 4) * Math.Max(1, (Me.Height + 3) \ 4) * 8
+                        BytesToRead = BaseBytes * 8
                     Case "ATI2", "BC5U"
                         CompressionMode = 5
-                        BytesToRead = Math.Max(1, (Me.Width + 3) \ 4) * Math.Max(1, (Me.Height + 3) \ 4) * 16
+                        BytesToRead = BaseBytes * 16
                     Case Else
                         Throw New Exception("Unsupported DXT Format: " & FourCC)
                 End Select
@@ -261,23 +276,27 @@ Public Class DDS_Decoder
                                                       Dim xPixelBase As Integer = xBlock * 4
                                                       Dim SourceIndex As Integer = (yBlock * BlockWidth + xBlock) * BytesPerBlock
                                                       Select Case CompressionMode
-                                                          Case 0, 1 ' BC1 / BC1a
+                                                          Case 0, 1 ' BC1 / BC1a / DXT1 / DXT1a
                                                               DecodeBlockBC1(SourceIndex, xPixelBase, yPixelBase, CompressionMode, BufferA, BufferB)
-                                                          Case 2 ' BC2
+                                                          Case 2 ' BC2 / DXT2-3
                                                               DecodeBlockBC1(SourceIndex + 8, xPixelBase, yPixelBase, CompressionMode, BufferA, BufferB)
                                                               DecodeBlockBC2(SourceIndex, xPixelBase, yPixelBase)
-                                                          Case 3 ' BC3
+                                                          Case 3 ' BC3 /DXT4-5
                                                               DecodeBlockBC1(SourceIndex + 8, xPixelBase, yPixelBase, CompressionMode, BufferA, BufferB)
                                                               DecodeBlockBC3(SourceIndex, xPixelBase, yPixelBase, 3, BufferA)
-                                                          Case 4 ' BC4
+                                                          Case 4 ' BC4 / ATI1
                                                               DecodeBlockBC3(SourceIndex, xPixelBase, yPixelBase, 2, BufferA)
                                                               DecodeBlockBC4(xPixelBase, yPixelBase)
-                                                          Case 5 ' BC5
+                                                          Case 5 ' BC5 / ATI2
                                                               DecodeBlockBC3(SourceIndex, xPixelBase, yPixelBase, 2, BufferB)
                                                               DecodeBlockBC3(SourceIndex + 8, xPixelBase, yPixelBase, 1, BufferA)
                                                               DecodeBlockBC5(xPixelBase, yPixelBase)
                                                           Case 7 ' BC7
                                                               DecodeBlockBC7(SourceIndex, xPixelBase, yPixelBase, BufferA, BufferB, BufferC, BufferD, BufferE, BufferF, BufferG)
+                                                          Case 30 ' DXT5n
+                                                              DecodeBlockBC1(SourceIndex + 8, xPixelBase, yPixelBase, CompressionMode, BufferA, BufferB)
+                                                              DecodeBlockBC3(SourceIndex, xPixelBase, yPixelBase, 3, BufferA)
+                                                              DecodeBlockBC3n(xPixelBase, yPixelBase)
                                                       End Select
                                                   Next
                                               End Sub)
@@ -324,6 +343,19 @@ Public Class DDS_Decoder
                 Dim RVal As Byte = DecodedBytes(destIdx + 2)
                 DecodedBytes(destIdx) = RVal
                 DecodedBytes(destIdx + 1) = RVal
+                DecodedBytes(destIdx + 3) = 255
+            End If
+        Next
+    End Sub
+
+    Private Sub DecodeBlockBC3n(xPixelBase As Integer, yPixelBase As Integer)
+        For i As Integer = 0 To 15
+            Dim pX As Integer = xPixelBase + (i And 3)
+            Dim pY As Integer = yPixelBase + (i >> 2)
+            If pX < Width AndAlso pY < Height Then
+                Dim destIdx As Integer = (pY * Width + pX) * 4
+                Dim RVal As Integer = DecodedBytes(destIdx + 3)
+                DecodedBytes(destIdx + 2) = RVal
                 DecodedBytes(destIdx + 3) = 255
             End If
         Next
@@ -815,7 +847,7 @@ Public Class DDS_Decoder
 
     Public Sub Save(Path As String, Format As ImageFormat)
         BeginDecode()
-        Using TempImage As New Bitmap(Width, Height, PixelFormat.Format32bppArgb)
+        Using TempImage As New Bitmap(Width, Height, OutputPixelFormat)
             Dim Rect As New Rectangle(0, 0, Width, Height)
             Dim TempData As BitmapData = TempImage.LockBits(Rect, ImageLockMode.WriteOnly, TempImage.PixelFormat)
             Marshal.Copy(DecodedBytes, 0, TempData.Scan0, DecodedBytes.Length)
@@ -826,7 +858,7 @@ Public Class DDS_Decoder
 
     Public Function ToBitmap() As Bitmap
         BeginDecode()
-        Dim TempImage As New Bitmap(Width, Height, PixelFormat.Format32bppArgb)
+        Dim TempImage As New Bitmap(Width, Height, OutputPixelFormat)
         Dim Rect As New Rectangle(0, 0, Width, Height)
         Dim TempData As BitmapData = TempImage.LockBits(Rect, ImageLockMode.WriteOnly, TempImage.PixelFormat)
         Marshal.Copy(DecodedBytes, 0, TempData.Scan0, DecodedBytes.Length)
@@ -838,9 +870,9 @@ Public Class DDS_Decoder
         DecodeCubeMap()
         For i As Integer = 0 To 5
             If CubeFaces(i) IsNot Nothing Then
-                Using bmp As New Bitmap(Me.Width, Me.Height, PixelFormat.Format32bppArgb)
+                Using bmp As New Bitmap(Me.Width, Me.Height, OutputPixelFormat)
                     Dim Ext As String = GetExtFromImageFormat(Format)
-                    Dim bmpData As BitmapData = bmp.LockBits(New Rectangle(0, 0, Me.Width, Me.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb)
+                    Dim bmpData As BitmapData = bmp.LockBits(New Rectangle(0, 0, Me.Width, Me.Height), ImageLockMode.WriteOnly, bmp.PixelFormat)
                     Marshal.Copy(CubeFaces(i), 0, bmpData.Scan0, CubeFaces(i).Count)
                     bmp.UnlockBits(bmpData)
                     bmp.Save($"{Path.Replace(Ext, "")}{CubeSuffixes(i)}{Ext}", Format)
@@ -854,8 +886,8 @@ Public Class DDS_Decoder
         Dim bmps(5) As Bitmap
         For i As Integer = 0 To 5
             If CubeFaces(i) IsNot Nothing Then
-                Dim bmp As New Bitmap(Width, Height, PixelFormat.Format32bppArgb)
-                Dim bmpData As BitmapData = bmp.LockBits(New Rectangle(0, 0, Width, Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb)
+                Dim bmp As New Bitmap(Width, Height, OutputPixelFormat)
+                Dim bmpData As BitmapData = bmp.LockBits(New Rectangle(0, 0, Width, Height), ImageLockMode.WriteOnly, bmp.PixelFormat)
                 Marshal.Copy(CubeFaces(i), 0, bmpData.Scan0, CubeFaces(i).Length)
                 bmp.UnlockBits(bmpData)
                 bmps(i) = bmp

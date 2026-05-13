@@ -3,6 +3,7 @@ Imports System.Text
 Imports System.Numerics
 Imports System.Drawing.Imaging
 Imports System.Drawing.Drawing2D
+Imports System.Runtime.InteropServices
 
 Public Class Form1
 
@@ -19,6 +20,8 @@ Public Class Form1
     Private CubeFaces(5) As CubeFace
     Private CubeScale As Single = 100.0F
     Private CubeOrientation As Quaternion = Quaternion.Identity
+
+    Private SpecialFlags As DDS_SpecialFlags
 
     Private Class CubeFace
         Public Image As Bitmap
@@ -202,15 +205,17 @@ Public Class Form1
         Dim targetFormat As DXGI_Format = GetFormatFromString(OverrideComboBox.SelectedItem.ToString())
         Dim isLegacy As Boolean = Not ExtendedHeaderCheckBox.Checked
         Dim doMipMaps As Boolean = MipMapCheckBox.Checked
+        Dim ddsSpecialFlags As DDS_SpecialFlags = SpecialFlags
         Using SFD As New SaveFileDialog With {.Filter = "DDS Files|*.dds|All Files|*.*", .FileName = Path.GetFileNameWithoutExtension(FilePath)}
             If SFD.ShowDialog() = DialogResult.OK Then
                 ToggleBusyState(True)
+                If ddsSpecialFlags = DDS_SpecialFlags.DDS_DXT5n Then SFD.FileName = SFD.FileName.Replace(".dds", "_n.dds")
                 If CubeMode AndAlso FilePaths IsNot Nothing Then
                     Using DDSEncoder As New DDS_Encoder(FilePaths, targetFormat, doMipMaps, isLegacy)
                         Await Task.Run(Sub() DDSEncoder.Save(SFD.FileName))
                     End Using
                 Else
-                    Using DDSEncoder As New DDS_Encoder(FilePath, targetFormat, doMipMaps, isLegacy)
+                    Using DDSEncoder As New DDS_Encoder(FilePath, targetFormat, doMipMaps, isLegacy, ddsSpecialFlags)
                         Await Task.Run(Sub() DDSEncoder.Save(SFD.FileName))
                     End Using
                 End If
@@ -229,7 +234,7 @@ Public Class Form1
         ToggleBusyState(True)
         Await RunBenchmarkAsync(Sub(FileName)
                                     Dim targetFormat As DXGI_Format = GetFormatFromString(TempFmt)
-                                    Using Encoder As New DDS_Encoder(FileName, targetFormat, TempMips, Not TempDX10)
+                                    Using Encoder As New DDS_Encoder(FileName, targetFormat, TempMips, Not TempDX10, SpecialFlags)
                                         Encoder.BeginEncode()
                                     End Using
                                 End Sub)
@@ -411,6 +416,7 @@ Public Class Form1
         If NoAlphaRB.Checked Then Return 0
         If SharpAlphaRB.Checked Then Return 1
         If SmoothAlphaRB.Checked Then Return 2
+        If PreMultAlphaRB.Checked Then Return 3
         Return 0
     End Function
 
@@ -418,6 +424,8 @@ Public Class Form1
         If NormalCheckBox.Checked Then
             If CompressionCheckBox.Checked Then
                 OverrideComboBox.Items.Add(If(IsDX10, "BC5 UNORM", "ATI2 (BC5)"))
+                If IsDX10 Then OverrideComboBox.Items.Add("BC7n sRGB")
+                OverrideComboBox.Items.Add(If(IsDX10, "BC3n sRGB", "DXT5n"))
             Else
                 OverrideComboBox.Items.Add("BGRX (B8G8R8X8)")
             End If
@@ -428,11 +436,14 @@ Public Class Form1
                     OverrideComboBox.Items.Add(If(IsDX10, "BC1 sRGB", "DXT1"))
                     OverrideComboBox.Items.Add(If(IsDX10, "BC4 UNORM", "ATI1 (BC4)"))
                 Case 1
-                    OverrideComboBox.Items.Add(If(IsDX10, "BC1 sRGB", "DXT1"))
+                    OverrideComboBox.Items.Add(If(IsDX10, "BC1a sRGB", "DXT1a"))
                     OverrideComboBox.Items.Add(If(IsDX10, "BC2 sRGB", "DXT3"))
                 Case 2
                     If IsDX10 Then OverrideComboBox.Items.Add("BC7 sRGB")
                     OverrideComboBox.Items.Add(If(IsDX10, "BC3 sRGB", "DXT5"))
+                Case 3
+                    OverrideComboBox.Items.Add(If(IsDX10, "BC2p sRGB", "DXT2"))
+                    OverrideComboBox.Items.Add(If(IsDX10, "BC3p sRGB", "DXT4"))
             End Select
         Else
             Select Case AlphaMode
@@ -444,12 +455,17 @@ Public Class Form1
 
     Private Function GetFormatFromString(FormatName As String) As DXGI_Format
         Select Case FormatName
-            Case "BC1 sRGB", "DXT1" : Return DXGI_Format.DXGI_FORMAT_BC1_UNORM_SRGB
+            Case "BC1 sRGB", "DXT1" : SpecialFlags = DDS_SpecialFlags.DDS_DXT1o : Return DXGI_Format.DXGI_FORMAT_BC1_UNORM_SRGB
+            Case "BC1a sRGB", "DXT1a" : Return DXGI_Format.DXGI_FORMAT_BC1_UNORM_SRGB
+            Case "BC2p sRGB", "DXT2" : SpecialFlags = DDS_SpecialFlags.DDS_DXT2 : Return DXGI_Format.DXGI_FORMAT_BC2_UNORM_SRGB
             Case "BC2 sRGB", "DXT3" : Return DXGI_Format.DXGI_FORMAT_BC2_UNORM_SRGB
+            Case "BC3p sRGB", "DXT4" : SpecialFlags = DDS_SpecialFlags.DDS_DXT4 : Return DXGI_Format.DXGI_FORMAT_BC3_UNORM_SRGB
             Case "BC3 sRGB", "DXT5" : Return DXGI_Format.DXGI_FORMAT_BC3_UNORM_SRGB
+            Case "BC3n sRGB", "DXT5n" : SpecialFlags = DDS_SpecialFlags.DDS_DXT5n : Return DXGI_Format.DXGI_FORMAT_BC3_UNORM_SRGB
             Case "BC4 UNORM", "ATI1 (BC4)" : Return DXGI_Format.DXGI_FORMAT_BC4_UNORM
             Case "BC5 UNORM", "ATI2 (BC5)" : Return DXGI_Format.DXGI_FORMAT_BC5_UNORM
             Case "BC7 sRGB" : Return DXGI_Format.DXGI_FORMAT_BC7_UNORM_SRGB
+            Case "BC7n sRGB" : SpecialFlags = DDS_SpecialFlags.DDS_DXT7n : Return DXGI_Format.DXGI_FORMAT_BC7_UNORM_SRGB
             Case "BGRX (B8G8R8X8)" : Return DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM_SRGB
             Case "BGRA (B8G8R8A8)" : Return DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM_SRGB
             Case Else : Throw New Exception($"Unsupported format: {FormatName}")

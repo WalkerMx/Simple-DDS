@@ -3,9 +3,9 @@
 ' http://doc.51windows.net/directx9_sdk/graphics/reference/DDSFileReference/ddsfileformat.htm
 ' https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds
 
-Imports System.IO
 Imports System.Drawing
 Imports System.Drawing.Imaging
+Imports System.IO
 Imports System.Runtime.InteropServices
 
 Public Class DDS_Encoder
@@ -42,6 +42,8 @@ Public Class DDS_Encoder
     Public MiscFlags2 As DX10_MiscFlags2
 
     Private HasAlpha As Boolean
+    Private HasPAlpha As Boolean
+    Private HasNormal As Boolean
     Private HasMipMaps As Boolean
     Private HasCompression As Boolean
     Private HasExtendedHeader As Boolean
@@ -49,6 +51,7 @@ Public Class DDS_Encoder
     Private MipCount As Integer
     Private BytesPerBlock As Integer
     Private CompressionMode As Integer
+    Private InputFormat As PixelFormat = PixelFormat.Format32bppArgb
 
     Private CubeFaces As String()
 
@@ -70,20 +73,28 @@ Public Class DDS_Encoder
     ''' <param name="Format">The explicit DXGI format to encode to.</param>
     ''' <param name="MipMaps">Create mipmaps for distant objects.</param>
     ''' <param name="LegacySupport">If true, strips the DX10 header and uses standard FourCC/Bitmasks. Throws an exception if the format requires DX10.</param>
-    Public Sub New(Source As String, Format As DXGI_Format, MipMaps As Boolean, Optional LegacySupport As Boolean = False)
+    Public Sub New(Source As String, Format As DXGI_Format, MipMaps As Boolean, Optional LegacySupport As Boolean = False, Optional SpecialFlags As DDS_SpecialFlags = 0)
         HasMipMaps = MipMaps
         DXGIFormat = Format
         HasExtendedHeader = Not LegacySupport
+        Select Case SpecialFlags
+            Case DDS_SpecialFlags.DDS_DXT2, DDS_SpecialFlags.DDS_DXT4
+                HasPAlpha = True
+                InputFormat = PixelFormat.Format32bppPArgb
+            Case DDS_SpecialFlags.DDS_DXT5n, DDS_SpecialFlags.DDS_DXT7n
+                HasNormal = True
+        End Select
         Using TempBitmap As Bitmap = Image.FromFile(Source)
             Width = TempBitmap.Width
             Height = TempBitmap.Height
             HasAlpha = Image.IsAlphaPixelFormat(TempBitmap.PixelFormat)
             Dim SourceRect As New Rectangle(0, 0, TempBitmap.Width, TempBitmap.Height)
-            Dim SourceData As BitmapData = TempBitmap.LockBits(SourceRect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb)
+            Dim SourceData As BitmapData = TempBitmap.LockBits(SourceRect, ImageLockMode.ReadOnly, InputFormat)
             WorkingBytes = New Byte(SourceData.Stride * TempBitmap.Height - 1) {}
             Marshal.Copy(SourceData.Scan0, WorkingBytes, 0, WorkingBytes.Length)
             TempBitmap.UnlockBits(SourceData)
         End Using
+        If SpecialFlags = DDS_SpecialFlags.DDS_DXT1o Then HasAlpha = False
         InitializeHeaderValues()
         WriteHeader()
     End Sub
@@ -144,7 +155,7 @@ Public Class DDS_Encoder
         GreenBitMask = {0, 0, 0, 0}
         BlueBitMask = {0, 0, 0, 0}
         AlphaBitMask = {0, 0, 0, 0}
-        Dim DynamicAlpha As DX10_MiscFlags2 = If(HasAlpha, DX10_MiscFlags2.DDS_ALPHA_MODE_STRAIGHT, DX10_MiscFlags2.DDS_ALPHA_MODE_OPAQUE)
+        Dim DynamicAlpha As DX10_MiscFlags2 = If(HasAlpha, If(HasPAlpha, DX10_MiscFlags2.DDS_ALPHA_MODE_PREMULTIPLIED, DX10_MiscFlags2.DDS_ALPHA_MODE_STRAIGHT), DX10_MiscFlags2.DDS_ALPHA_MODE_OPAQUE)
         Select Case DXGIFormat
             Case &H46, &H47, &H48 ' BC1 Typeless, UNORM, SRGB
                 HasCompression = True
@@ -156,13 +167,13 @@ Public Class DDS_Encoder
                 HasCompression = True
                 CompressionMode = 2
                 BytesPerBlock = 16
-                FourCC = "DXT3"
+                FourCC = If(HasPAlpha, "DXT2", "DXT3")
                 MiscFlags2 = DynamicAlpha
             Case &H4C, &H4D, &H4E ' BC3 Typeless, UNORM, SRGB
                 HasCompression = True
-                CompressionMode = 3
+                CompressionMode = If(HasNormal, 30, 3)
                 BytesPerBlock = 16
-                FourCC = "DXT5"
+                FourCC = If(HasPAlpha, "DXT4", "DXT5")
                 MiscFlags2 = DynamicAlpha
             Case &H4F, &H50 ' BC4 Typeless, UNORM
                 HasCompression = True
@@ -181,7 +192,7 @@ Public Class DDS_Encoder
                     Throw New ArgumentException($"Invalid format: {DXGIFormat.ToString()}.")
                 End If
                 HasCompression = True
-                CompressionMode = 7
+                CompressionMode = If(HasNormal, 70, 7)
                 BytesPerBlock = 16
                 MiscFlags2 = DynamicAlpha
             Case &H57, &H5A, &H5B ' B8G8R8A8 Typeless, UNORM, SRGB
@@ -316,7 +327,7 @@ Public Class DDS_Encoder
                         Throw New InvalidDataException($"Dimensions of face {faceIndex} do not match the base (+X) image.")
                     End If
                     Dim SourceRect As New Rectangle(0, 0, TempBitmap.Width, TempBitmap.Height)
-                    Dim SourceData As BitmapData = TempBitmap.LockBits(SourceRect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb)
+                    Dim SourceData As BitmapData = TempBitmap.LockBits(SourceRect, ImageLockMode.ReadOnly, InputFormat)
                     WorkingBytes = New Byte(SourceData.Stride * TempBitmap.Height - 1) {}
                     Marshal.Copy(SourceData.Scan0, WorkingBytes, 0, WorkingBytes.Length)
                     TempBitmap.UnlockBits(SourceData)
@@ -397,13 +408,59 @@ Public Class DDS_Encoder
                                                           Case 5 ' BC5
                                                               EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 2, Result, currentBlockOffset, BufferA)
                                                               EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 1, Result, currentBlockOffset + 8, BufferB)
-                                                          Case 7 ' BC7 (Modes 1, 6, & 7)
+                                                          Case 7 ' BC7 (DXT7)
                                                               EncodeBlockBC7(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset, BufferA, BufferB, BufferC, BufferD, BufferE, BufferF)
+                                                          Case 30 ' DXT5n
+                                                              EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 2, Result, currentBlockOffset, BufferA)
+                                                              EncodeBlockBC1n(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset + 8, BufferA, 1)
+                                                          Case 70 ' DXT7n (Dynamic Mode 4)
+                                                              EncodeBlockBC7n(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset, BufferA, BufferB, BufferC, BufferD, BufferE, BufferF)
                                                       End Select
                                                   Next
                                               End Sub)
         Return Result
     End Function
+
+    Private Sub EncodeBlockBC7n(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, Result As Byte(), OutputOffset As Integer, LocalR() As Integer, LocalG() As Integer, ColorEndpoints() As Integer, AlphaEndpoints() As Integer, ColorIndices() As Integer, AlphaIndices() As Integer)
+        Dim minG As Integer = 255 : Dim maxG As Integer = 0
+        Dim minR As Integer = 255 : Dim maxR As Integer = 0
+        Dim LocalIndex As Integer = 0
+        For j As Integer = 0 To 3
+            Dim yPixel As Integer = Math.Min(yPixelBase + j, Height - 1)
+            Dim RowInputOffset As Integer = yPixel * Width * 4
+            For i As Integer = 0 To 3
+                Dim xPixel As Integer = Math.Min(xPixelBase + i, Width - 1)
+                Dim PixelIndex As Integer = RowInputOffset + (xPixel * 4)
+                Dim rVal As Integer = SourceData(PixelIndex + 2)
+                Dim gVal As Integer = SourceData(PixelIndex + 1)
+                LocalR(LocalIndex) = rVal
+                LocalG(LocalIndex) = gVal
+                If gVal < minG Then minG = gVal
+                If gVal > maxG Then maxG = gVal
+                If rVal < minR Then minR = rVal
+                If rVal > maxR Then maxR = rVal
+                LocalIndex += 1
+            Next
+        Next
+        Dim RangeG As Integer = maxG - minG
+        Dim RangeR As Integer = maxR - minR
+        ColorEndpoints(0) = 0 : ColorEndpoints(1) = 0
+        ColorEndpoints(2) = 0 : ColorEndpoints(3) = 0
+        ColorEndpoints(4) = 0 : ColorEndpoints(5) = 0
+        If RangeR >= RangeG Then
+            GetEndpoints1D_Mode4Alpha(LocalR, AlphaEndpoints, 0, AlphaIndices, minR, maxR)
+            GetEndpoints1D(LocalG, 5, ColorEndpoints, 2, ColorIndices, minG, maxG)
+            ColorEndpoints(0) = 31 : ColorEndpoints(1) = 31
+            ColorEndpoints(4) = 0 : ColorEndpoints(5) = 0
+            EncodeMode4(ColorEndpoints, AlphaEndpoints, ColorIndices, AlphaIndices, 1, Result, OutputOffset)
+        Else
+            GetEndpoints1D_Mode4Alpha(LocalG, AlphaEndpoints, 0, AlphaIndices, minG, maxG)
+            GetEndpoints1D(LocalR, 5, ColorEndpoints, 0, ColorIndices, minR, maxR)
+            ColorEndpoints(2) = 31 : ColorEndpoints(3) = 31
+            ColorEndpoints(4) = 0 : ColorEndpoints(5) = 0
+            EncodeMode4(ColorEndpoints, AlphaEndpoints, ColorIndices, AlphaIndices, 2, Result, OutputOffset)
+        End If
+    End Sub
 
     Private Sub EncodeBlockBC7(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, Result As Byte(), OutputOffset As Integer, LocalB() As Integer, LocalG() As Integer, LocalR() As Integer, LocalA() As Integer, Endpoints() As Integer, Indicies() As Integer)
         Dim LocalMin As Integer = 255
@@ -579,6 +636,57 @@ Public Class DDS_Encoder
                 byteIdx += 1
             Next
         Next
+    End Sub
+
+    Private Sub EncodeBlockBC1n(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, Result As Byte(), OutputOffset As Integer, LocalBuffer() As Integer, ChannelOffset As Integer)
+        Dim minVal As Integer = 255
+        Dim maxVal As Integer = 0
+        Dim isEdge As Boolean = (xPixelBase + 4 > Width) Or (yPixelBase + 4 > Height)
+        Dim idx As Integer = 0
+        For j As Integer = 0 To 3
+            Dim yPixel As Integer = If(isEdge, Math.Min(yPixelBase + j, Height - 1), yPixelBase + j)
+            Dim rowOffset As Integer = yPixel * Width * 4
+            For i As Integer = 0 To 3
+                Dim xPixel As Integer = If(isEdge, Math.Min(xPixelBase + i, Width - 1), xPixelBase + i)
+                Dim val As Integer = SourceData(rowOffset + (xPixel * 4) + ChannelOffset)
+                LocalBuffer(idx) = val
+                If val < minVal Then minVal = val
+                If val > maxVal Then maxVal = val
+                idx += 1
+            Next
+        Next
+        Dim g0 As Integer = maxVal >> 2
+        Dim g1 As Integer = minVal >> 2
+        If g0 <= g1 Then
+            If g0 < 63 Then g0 += 1 Else If g1 > 0 Then g1 -= 1
+        End If
+        Dim col0 As UShort = CUShort(g0 << 5)
+        Dim col1 As UShort = CUShort(g1 << 5)
+        Dim ColorTable As UInteger = 0
+        Dim g0_8 As Integer = (g0 << 2) Or (g0 >> 4)
+        Dim g1_8 As Integer = (g1 << 2) Or (g1 >> 4)
+        Dim range8 As Integer = g0_8 - g1_8
+        If range8 > 0 Then
+            For i As Integer = 0 To 15
+                Dim scaledDist As Integer = ((LocalBuffer(i) - g1_8) * 3 + (range8 >> 1)) \ range8
+                Dim index As UInteger
+                Select Case scaledDist
+                    Case >= 3 : index = 0
+                    Case <= 0 : index = 1
+                    Case 2 : index = 2
+                    Case Else : index = 3
+                End Select
+                ColorTable = ColorTable Or (index << (i * 2))
+            Next
+        End If
+        Result(OutputOffset) = CByte(col0 And &HFF)
+        Result(OutputOffset + 1) = CByte(col0 >> 8)
+        Result(OutputOffset + 2) = CByte(col1 And &HFF)
+        Result(OutputOffset + 3) = CByte(col1 >> 8)
+        Result(OutputOffset + 4) = CByte(ColorTable And &HFF)
+        Result(OutputOffset + 5) = CByte((ColorTable >> 8) And &HFF)
+        Result(OutputOffset + 6) = CByte((ColorTable >> 16) And &HFF)
+        Result(OutputOffset + 7) = CByte((ColorTable >> 24) And &HFF)
     End Sub
 
     Private Sub EncodeBlockBC1a(Result As Byte(), OutputOffset As Integer, PixelArray() As Integer, AlphaMask As UShort)
@@ -808,6 +916,59 @@ Public Class DDS_Encoder
         Next
     End Sub
 
+    Private Sub EncodeMode4(ColorEndpoints() As Integer, AlphaEndpoints() As Integer, ColorIndices() As Integer, AlphaIndices() As Integer, Rotation As Integer, Result As Byte(), OutputOffset As Integer)
+        If ColorIndices(0) >= 2 Then
+            Dim t As Integer
+            t = ColorEndpoints(0) : ColorEndpoints(0) = ColorEndpoints(1) : ColorEndpoints(1) = t
+            t = ColorEndpoints(2) : ColorEndpoints(2) = ColorEndpoints(3) : ColorEndpoints(3) = t
+            t = ColorEndpoints(4) : ColorEndpoints(4) = ColorEndpoints(5) : ColorEndpoints(5) = t
+            For i As Integer = 0 To 15
+                ColorIndices(i) = 3 - ColorIndices(i)
+            Next
+        End If
+        If AlphaIndices(0) >= 4 Then
+            Dim t As Integer
+            t = AlphaEndpoints(0) : AlphaEndpoints(0) = AlphaEndpoints(1) : AlphaEndpoints(1) = t
+            For i As Integer = 0 To 15
+                AlphaIndices(i) = 7 - AlphaIndices(i)
+            Next
+        End If
+        Dim LowBytes As ULong = &H10UL
+        LowBytes = LowBytes Or (CULng(Rotation And 3) << 5)
+        LowBytes = LowBytes Or (CULng(ColorEndpoints(0) And &H1F) << 8)
+        LowBytes = LowBytes Or (CULng(ColorEndpoints(1) And &H1F) << 13)
+        LowBytes = LowBytes Or (CULng(ColorEndpoints(2) And &H1F) << 18)
+        LowBytes = LowBytes Or (CULng(ColorEndpoints(3) And &H1F) << 23)
+        LowBytes = LowBytes Or (CULng(ColorEndpoints(4) And &H1F) << 28)
+        LowBytes = LowBytes Or (CULng(ColorEndpoints(5) And &H1F) << 33)
+        LowBytes = LowBytes Or (CULng(AlphaEndpoints(0) And &H3F) << 38)
+        LowBytes = LowBytes Or (CULng(AlphaEndpoints(1) And &H3F) << 44)
+        LowBytes = LowBytes Or ((CULng(ColorIndices(0)) And 1UL) << 50)
+        Dim HighBytes As ULong = 0UL
+        Dim bitPos As Integer = 51
+        For i As Integer = 1 To 15
+            If bitPos < 63 Then
+                LowBytes = LowBytes Or ((CULng(ColorIndices(i)) And 3UL) << bitPos)
+            ElseIf bitPos = 63 Then
+                LowBytes = LowBytes Or ((CULng(ColorIndices(i)) And 1UL) << 63)
+                HighBytes = HighBytes Or ((CULng(ColorIndices(i)) And 2UL) >> 1)
+            Else
+                HighBytes = HighBytes Or ((CULng(ColorIndices(i)) And 3UL) << (bitPos - 64))
+            End If
+            bitPos += 2
+        Next
+        HighBytes = HighBytes Or ((CULng(AlphaIndices(0)) And 3UL) << 17)
+        Dim shiftH As Integer = 19
+        For i As Integer = 1 To 15
+            HighBytes = HighBytes Or ((CULng(AlphaIndices(i)) And 7UL) << shiftH)
+            shiftH += 3
+        Next
+        For i As Integer = 0 To 7
+            Result(OutputOffset + i) = CByte((LowBytes >> (i << 3)) And &HFFUL)
+            Result(OutputOffset + 8 + i) = CByte((HighBytes >> (i << 3)) And &HFFUL)
+        Next
+    End Sub
+
     Private Sub EncodeMode1(PartitionID As Integer, Endpoints() As Integer, Indices() As Integer, Result As Byte(), OutputOffset As Integer, PBits As Integer)
         Dim subMask = PartitionTable2(PartitionID)
         Dim anchor0 As Integer = 0
@@ -871,12 +1032,12 @@ Public Class DDS_Encoder
                 Dim b As Integer = LocalB(i)
                 Dim a As Integer = LocalA(i) * alphaMult
                 sumR += r : sumG += g : sumB += b : sumA += a
-                    sumRR += r * r : sumGG += g * g : sumBB += b * b : sumAA += a * a
-                    sumRG += r * g : sumRB += r * b : sumRA += r * a
-                    sumGB += g * b : sumGA += g * a
-                    sumBA += b * a
-                    count += 1
-                End If
+                sumRR += r * r : sumGG += g * g : sumBB += b * b : sumAA += a * a
+                sumRG += r * g : sumRB += r * b : sumRA += r * a
+                sumGB += g * b : sumGA += g * a
+                sumBA += b * a
+                count += 1
+            End If
         Next
         If count = 0 Then Return
         Dim invCount As Single = 1.0F / CSng(count)
@@ -958,6 +1119,64 @@ Public Class DDS_Encoder
                 If index > indexMax Then index = indexMax Else If index < 0 Then index = 0
                 indices(i) = index
             End If
+        Next
+    End Sub
+
+    Private Sub GetEndpoints1D(LocalChannel() As Integer, Bits As Integer, Endpoints() As Integer, epOffset As Integer, Indices() As Integer, minVal As Integer, maxVal As Integer)
+        If minVal = maxVal Then
+            Endpoints(epOffset + 0) = minVal >> (8 - Bits)
+            Endpoints(epOffset + 1) = minVal >> (8 - Bits)
+            For i As Integer = 0 To 15
+                Indices(i) = 0
+            Next
+            Return
+        End If
+        Dim shift As Integer = 8 - Bits
+        Dim ep0 As Integer = minVal >> shift
+        Dim ep1 As Integer = maxVal >> shift
+        Endpoints(epOffset + 0) = ep0
+        Endpoints(epOffset + 1) = ep1
+        Dim ep0_8 As Integer
+        Dim ep1_8 As Integer
+        If Bits = 5 Then
+            ep0_8 = (ep0 << 3) Or (ep0 >> 2)
+            ep1_8 = (ep1 << 3) Or (ep1 >> 2)
+        Else
+            ep0_8 = ep0
+            ep1_8 = ep1
+        End If
+        Dim range As Integer = ep1_8 - ep0_8
+        If range = 0 Then range = 1
+        For i As Integer = 0 To 15
+            Dim dist As Integer = LocalChannel(i) - ep0_8
+            Dim idx As Integer = (dist * 3 + (range >> 1)) \ range
+            If idx < 0 Then idx = 0 Else If idx > 3 Then idx = 3
+            Indices(i) = idx
+        Next
+    End Sub
+
+    Private Sub GetEndpoints1D_Mode4Alpha(LocalChannel() As Integer, Endpoints() As Integer, epOffset As Integer, Indices() As Integer, minVal As Integer, maxVal As Integer)
+        If minVal = maxVal Then
+            Endpoints(epOffset + 0) = minVal >> 2
+            Endpoints(epOffset + 1) = minVal >> 2
+            For i As Integer = 0 To 15
+                Indices(i) = 0
+            Next
+            Return
+        End If
+        Dim ep0 As Integer = minVal >> 2
+        Dim ep1 As Integer = maxVal >> 2
+        Endpoints(epOffset + 0) = ep0
+        Endpoints(epOffset + 1) = ep1
+        Dim ep0_8 As Integer = (ep0 << 2) Or (ep0 >> 4)
+        Dim ep1_8 As Integer = (ep1 << 2) Or (ep1 >> 4)
+        Dim range As Integer = ep1_8 - ep0_8
+        If range = 0 Then range = 1
+        For i As Integer = 0 To 15
+            Dim dist As Integer = LocalChannel(i) - ep0_8
+            Dim idx As Integer = (dist * 7 + (range >> 1)) \ range
+            If idx < 0 Then idx = 0 Else If idx > 7 Then idx = 7
+            Indices(i) = idx
         Next
     End Sub
 
