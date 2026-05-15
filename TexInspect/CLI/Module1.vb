@@ -10,6 +10,7 @@ Public Module Module1
         Public InputPaths(5) As String
         Public OutputPath As String = ""
         Public Format As DXGI_Format = DXGI_Format.DXGI_FORMAT_BC7_UNORM_SRGB
+        Public SpecialFlags As DDS_SpecialFlags = 0
         Public GenerateMips As Boolean = False
         Public UseLegacyHeader As Boolean = False
         Public ShowInfo As Boolean = False
@@ -21,19 +22,20 @@ Public Module Module1
         Public IsCube As Boolean = False
     End Class
 
-    Private ReadOnly ImgExts As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {".png", ".jpg", ".jpeg", ".bmp", ".tga"}
+    Private ReadOnly ImgExts As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {".png", ".jpg", ".jpeg", ".bmp"}
     Private ReadOnly DdsExts As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {".dds"}
-    Private ReadOnly LegacyFormats As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {"DXT1", "DXT3", "DXT5", "ATI1", "ATI2"}
+    Private ReadOnly LegacyFormats As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {"DXT1", "DXT2", "DXT3", "DXT4", "DXT5", "DXT5n", "ATI1", "ATI2"}
 
     Private ReadOnly FormatAliases As New Dictionary(Of String, DXGI_Format)(StringComparer.OrdinalIgnoreCase) From {
         {"BC1", DXGI_Format.DXGI_FORMAT_BC1_UNORM_SRGB}, {"BC1 SRGB", DXGI_Format.DXGI_FORMAT_BC1_UNORM_SRGB}, {"DXT1", DXGI_Format.DXGI_FORMAT_BC1_UNORM_SRGB}, {"BC1_UNORM_SRGB", DXGI_Format.DXGI_FORMAT_BC1_UNORM_SRGB},
-        {"BC2", DXGI_Format.DXGI_FORMAT_BC2_UNORM_SRGB}, {"BC2 SRGB", DXGI_Format.DXGI_FORMAT_BC2_UNORM_SRGB}, {"DXT3", DXGI_Format.DXGI_FORMAT_BC2_UNORM_SRGB}, {"BC2_UNORM_SRGB", DXGI_Format.DXGI_FORMAT_BC2_UNORM_SRGB},
-        {"BC3", DXGI_Format.DXGI_FORMAT_BC3_UNORM_SRGB}, {"BC3 SRGB", DXGI_Format.DXGI_FORMAT_BC3_UNORM_SRGB}, {"DXT5", DXGI_Format.DXGI_FORMAT_BC3_UNORM_SRGB}, {"BC3_UNORM_SRGB", DXGI_Format.DXGI_FORMAT_BC3_UNORM_SRGB},
-        {"BC4", DXGI_Format.DXGI_FORMAT_BC4_UNORM}, {"BC4 UNORM", DXGI_Format.DXGI_FORMAT_BC4_UNORM}, {"ATI1", DXGI_Format.DXGI_FORMAT_BC4_UNORM}, {"ATI1 (BC4)", DXGI_Format.DXGI_FORMAT_BC4_UNORM}, {"BC4_UNORM", DXGI_Format.DXGI_FORMAT_BC4_UNORM},
-        {"BC5", DXGI_Format.DXGI_FORMAT_BC5_UNORM}, {"BC5 UNORM", DXGI_Format.DXGI_FORMAT_BC5_UNORM}, {"ATI2", DXGI_Format.DXGI_FORMAT_BC5_UNORM}, {"ATI2 (BC5)", DXGI_Format.DXGI_FORMAT_BC5_UNORM}, {"BC5_UNORM", DXGI_Format.DXGI_FORMAT_BC5_UNORM},
-        {"BC7", DXGI_Format.DXGI_FORMAT_BC7_UNORM_SRGB}, {"BC7 SRGB", DXGI_Format.DXGI_FORMAT_BC7_UNORM_SRGB}, {"BC7_UNORM_SRGB", DXGI_Format.DXGI_FORMAT_BC7_UNORM_SRGB},
-        {"BGRX", DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM_SRGB}, {"BGRX (B8G8R8X8)", DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM_SRGB}, {"B8G8R8X8_UNORM_SRGB", DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM_SRGB},
-        {"BGRA", DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM_SRGB}, {"BGRA (B8G8R8A8)", DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM_SRGB}, {"B8G8R8A8_UNORM_SRGB", DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM_SRGB}}
+        {"BC2", DXGI_Format.DXGI_FORMAT_BC2_UNORM_SRGB}, {"BC2 SRGB", DXGI_Format.DXGI_FORMAT_BC2_UNORM_SRGB}, {"DXT2", DXGI_Format.DXGI_FORMAT_BC2_UNORM_SRGB}, {"DXT3", DXGI_Format.DXGI_FORMAT_BC2_UNORM_SRGB},
+        {"BC2_UNORM_SRGB", DXGI_Format.DXGI_FORMAT_BC2_UNORM_SRGB}, {"BC3", DXGI_Format.DXGI_FORMAT_BC3_UNORM_SRGB}, {"BC3 SRGB", DXGI_Format.DXGI_FORMAT_BC3_UNORM_SRGB}, {"DXT4", DXGI_Format.DXGI_FORMAT_BC3_UNORM_SRGB},
+        {"DXT5", DXGI_Format.DXGI_FORMAT_BC3_UNORM_SRGB}, {"DXT5n", DXGI_Format.DXGI_FORMAT_BC3_UNORM_SRGB}, {"BC3_UNORM_SRGB", DXGI_Format.DXGI_FORMAT_BC3_UNORM_SRGB}, {"BC4", DXGI_Format.DXGI_FORMAT_BC4_UNORM},
+        {"BC4 UNORM", DXGI_Format.DXGI_FORMAT_BC4_UNORM}, {"ATI1", DXGI_Format.DXGI_FORMAT_BC4_UNORM}, {"ATI1 (BC4)", DXGI_Format.DXGI_FORMAT_BC4_UNORM}, {"BC4_UNORM", DXGI_Format.DXGI_FORMAT_BC4_UNORM},
+        {"BC5", DXGI_Format.DXGI_FORMAT_BC5_UNORM}, {"BC5 UNORM", DXGI_Format.DXGI_FORMAT_BC5_UNORM}, {"ATI2", DXGI_Format.DXGI_FORMAT_BC5_UNORM}, {"ATI2 (BC5)", DXGI_Format.DXGI_FORMAT_BC5_UNORM},
+        {"BC5_UNORM", DXGI_Format.DXGI_FORMAT_BC5_UNORM}, {"BC7n", DXGI_Format.DXGI_FORMAT_BC7_UNORM_SRGB}, {"BC7", DXGI_Format.DXGI_FORMAT_BC7_UNORM_SRGB}, {"BC7 SRGB", DXGI_Format.DXGI_FORMAT_BC7_UNORM_SRGB},
+        {"BC7_UNORM_SRGB", DXGI_Format.DXGI_FORMAT_BC7_UNORM_SRGB}, {"BGRX", DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM_SRGB}, {"BGRX (B8G8R8X8)", DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM_SRGB},
+        {"B8G8R8X8_UNORM_SRGB", DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM_SRGB}, {"BGRA", DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM_SRGB}, {"BGRA (B8G8R8A8)", DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM_SRGB}, {"B8G8R8A8_UNORM_SRGB", DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM_SRGB}}
 
     Sub Main(args As String())
         If args.Length = 0 OrElse args.Contains("-h", StringComparer.OrdinalIgnoreCase) OrElse args.Contains("--help", StringComparer.OrdinalIgnoreCase) Then
@@ -57,6 +59,16 @@ Public Module Module1
                     Opts.ForceOverwrite = True
                 Case "-fmt", "--format"
                     Opts.Format = GetFormatFromString(args(i + 1))
+                    Select Case args(i + 1).ToLower
+                        Case "dxt2"
+                            Opts.SpecialFlags = DDS_SpecialFlags.DDS_DXT2
+                        Case "dxt4"
+                            Opts.SpecialFlags = DDS_SpecialFlags.DDS_DXT4
+                        Case "dxt5n"
+                            Opts.SpecialFlags = DDS_SpecialFlags.DDS_DXT5n
+                        Case "bc7n"
+                            Opts.SpecialFlags = DDS_SpecialFlags.DDS_BC7n
+                    End Select
                     If LegacyFormats.Contains(args(i + 1)) Then Opts.UseLegacyHeader = True
                     i += 1
                 Case "-m", "--mipmaps"
@@ -230,7 +242,7 @@ Public Module Module1
             End Using
             Console.WriteLine($"[SUCCESS] CubeMap (6 faces) -> {Path.GetFileName(Target)}")
         Else
-            Using Encoder As New DDS_Encoder(Source, CliOpts.Format, CliOpts.GenerateMips, CliOpts.UseLegacyHeader)
+            Using Encoder As New DDS_Encoder(Source, CliOpts.Format, CliOpts.GenerateMips, CliOpts.UseLegacyHeader, CliOpts.SpecialFlags)
                 Encoder.Save(Target)
             End Using
             Console.WriteLine($"[SUCCESS] {Path.GetFileName(Source)} -> {Path.GetFileName(Target)}")

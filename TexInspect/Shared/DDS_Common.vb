@@ -123,7 +123,7 @@ Public Module DDS_Common
         DDS_DXT2 = &H2
         DDS_DXT4 = &H3
         DDS_DXT5n = &H4
-        DDS_DXT7n = &H5
+        DDS_BC7n = &H5
     End Enum
 
     ' BC7 Mode 1/7 Heuristic Tables

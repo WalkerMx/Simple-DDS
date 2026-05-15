@@ -3,7 +3,6 @@ Imports System.Text
 Imports System.Numerics
 Imports System.Drawing.Imaging
 Imports System.Drawing.Drawing2D
-Imports System.Runtime.InteropServices
 
 Public Class Form1
 
@@ -61,7 +60,7 @@ Public Class Form1
             Dim files() As String = DirectCast(e.Data.GetData(DataFormats.FileDrop), String())
             If files.Length > 0 Then
                 Dim FileExt As String = Path.GetExtension(files(0)).ToLower
-                If {".dds", ".png", ".jpg", ".jpeg", ".bmp"}.Contains(FileExt) Then
+                If {".dds", ".png", ".jpg", ".jpeg", ".bmp", ".tga"}.Contains(FileExt) Then
                     Await ProcessLoadedFileAsync(files(0))
                 Else
                     MessageBox.Show($"Invalid format: {FileExt}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Information)
@@ -88,7 +87,7 @@ Public Class Form1
     End Sub
 
     Private Async Sub LoadImageButton_Click(sender As Object, e As EventArgs) Handles LoadImageButton.Click
-        Using OFD As New OpenFileDialog With {.Filter = "Image Files|*.png;*.jpg;*.bmp;*.dds"}
+        Using OFD As New OpenFileDialog With {.Filter = "Image Files|*.png;*.jpg;*.bmp;*.tga;*.dds"}
             If OFD.ShowDialog() = DialogResult.OK Then
                 Await ProcessLoadedFileAsync(OFD.FileName)
             End If
@@ -465,7 +464,7 @@ Public Class Form1
             Case "BC4 UNORM", "ATI1 (BC4)" : Return DXGI_Format.DXGI_FORMAT_BC4_UNORM
             Case "BC5 UNORM", "ATI2 (BC5)" : Return DXGI_Format.DXGI_FORMAT_BC5_UNORM
             Case "BC7 sRGB" : Return DXGI_Format.DXGI_FORMAT_BC7_UNORM_SRGB
-            Case "BC7n sRGB" : SpecialFlags = DDS_SpecialFlags.DDS_DXT7n : Return DXGI_Format.DXGI_FORMAT_BC7_UNORM_SRGB
+            Case "BC7n sRGB" : SpecialFlags = DDS_SpecialFlags.DDS_BC7n : Return DXGI_Format.DXGI_FORMAT_BC7_UNORM_SRGB
             Case "BGRX (B8G8R8X8)" : Return DXGI_Format.DXGI_FORMAT_B8G8R8X8_UNORM_SRGB
             Case "BGRA (B8G8R8A8)" : Return DXGI_Format.DXGI_FORMAT_B8G8R8A8_UNORM_SRGB
             Case Else : Throw New Exception($"Unsupported format: {FormatName}")

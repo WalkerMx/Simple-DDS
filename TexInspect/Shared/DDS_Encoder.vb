@@ -3,9 +3,9 @@
 ' http://doc.51windows.net/directx9_sdk/graphics/reference/DDSFileReference/ddsfileformat.htm
 ' https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds
 
+Imports System.IO
 Imports System.Drawing
 Imports System.Drawing.Imaging
-Imports System.IO
 Imports System.Runtime.InteropServices
 
 Public Class DDS_Encoder
@@ -81,7 +81,7 @@ Public Class DDS_Encoder
             Case DDS_SpecialFlags.DDS_DXT2, DDS_SpecialFlags.DDS_DXT4
                 HasPAlpha = True
                 InputFormat = PixelFormat.Format32bppPArgb
-            Case DDS_SpecialFlags.DDS_DXT5n, DDS_SpecialFlags.DDS_DXT7n
+            Case DDS_SpecialFlags.DDS_DXT5n, DDS_SpecialFlags.DDS_BC7n
                 HasNormal = True
         End Select
         Using TempBitmap As Bitmap = Image.FromFile(Source)
@@ -408,12 +408,12 @@ Public Class DDS_Encoder
                                                           Case 5 ' BC5
                                                               EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 2, Result, currentBlockOffset, BufferA)
                                                               EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 1, Result, currentBlockOffset + 8, BufferB)
-                                                          Case 7 ' BC7 (DXT7)
+                                                          Case 7 ' BC7
                                                               EncodeBlockBC7(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset, BufferA, BufferB, BufferC, BufferD, BufferE, BufferF)
                                                           Case 30 ' DXT5n
                                                               EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 2, Result, currentBlockOffset, BufferA)
                                                               EncodeBlockBC1n(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset + 8, BufferA, 1)
-                                                          Case 70 ' DXT7n (Dynamic Mode 4)
+                                                          Case 70 ' BC7n (Dynamic Mode 4)
                                                               EncodeBlockBC7n(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset, BufferA, BufferB, BufferC, BufferD, BufferE, BufferF)
                                                       End Select
                                                   Next
@@ -448,16 +448,14 @@ Public Class DDS_Encoder
         ColorEndpoints(2) = 0 : ColorEndpoints(3) = 0
         ColorEndpoints(4) = 0 : ColorEndpoints(5) = 0
         If RangeR >= RangeG Then
-            GetEndpoints1D_Mode4Alpha(LocalR, AlphaEndpoints, 0, AlphaIndices, minR, maxR)
-            GetEndpoints1D(LocalG, 5, ColorEndpoints, 2, ColorIndices, minG, maxG)
+            GetEndpoints1D(LocalR, 6, 3, AlphaEndpoints, 0, AlphaIndices, minR, maxR)
+            GetEndpoints1D(LocalG, 5, 2, ColorEndpoints, 2, ColorIndices, minG, maxG)
             ColorEndpoints(0) = 31 : ColorEndpoints(1) = 31
-            ColorEndpoints(4) = 0 : ColorEndpoints(5) = 0
             EncodeMode4(ColorEndpoints, AlphaEndpoints, ColorIndices, AlphaIndices, 1, Result, OutputOffset)
         Else
-            GetEndpoints1D_Mode4Alpha(LocalG, AlphaEndpoints, 0, AlphaIndices, minG, maxG)
-            GetEndpoints1D(LocalR, 5, ColorEndpoints, 0, ColorIndices, minR, maxR)
+            GetEndpoints1D(LocalG, 6, 3, AlphaEndpoints, 0, AlphaIndices, minG, maxG)
+            GetEndpoints1D(LocalR, 5, 2, ColorEndpoints, 0, ColorIndices, minR, maxR)
             ColorEndpoints(2) = 31 : ColorEndpoints(3) = 31
-            ColorEndpoints(4) = 0 : ColorEndpoints(5) = 0
             EncodeMode4(ColorEndpoints, AlphaEndpoints, ColorIndices, AlphaIndices, 2, Result, OutputOffset)
         End If
     End Sub
@@ -657,11 +655,15 @@ Public Class DDS_Encoder
         Next
         Dim g0 As Integer = maxVal >> 2
         Dim g1 As Integer = minVal >> 2
-        If g0 <= g1 Then
-            If g0 < 63 Then g0 += 1 Else If g1 > 0 Then g1 -= 1
-        End If
         Dim col0 As UShort = CUShort(g0 << 5)
         Dim col1 As UShort = CUShort(g1 << 5)
+        If g0 = g1 Then
+            Result(OutputOffset) = CByte(col0 And &HFF)
+            Result(OutputOffset + 1) = CByte(col0 >> 8)
+            Result(OutputOffset + 2) = CByte(col0 And &HFF)
+            Result(OutputOffset + 3) = CByte(col0 >> 8)
+            Return
+        End If
         Dim ColorTable As UInteger = 0
         Dim g0_8 As Integer = (g0 << 2) Or (g0 >> 4)
         Dim g1_8 As Integer = (g1 << 2) Or (g1 >> 4)
@@ -669,14 +671,13 @@ Public Class DDS_Encoder
         If range8 > 0 Then
             For i As Integer = 0 To 15
                 Dim scaledDist As Integer = ((LocalBuffer(i) - g1_8) * 3 + (range8 >> 1)) \ range8
-                Dim index As UInteger
-                Select Case scaledDist
-                    Case >= 3 : index = 0
-                    Case <= 0 : index = 1
-                    Case 2 : index = 2
-                    Case Else : index = 3
-                End Select
-                ColorTable = ColorTable Or (index << (i * 2))
+                If scaledDist < 0 Then
+                    scaledDist = 0
+                ElseIf scaledDist > 3 Then
+                    scaledDist = 3
+                End If
+                Dim index As UInteger = CUInt((&H231 >> (scaledDist << 2)) And 3)
+                ColorTable = ColorTable Or (index << (i << 1))
             Next
         End If
         Result(OutputOffset) = CByte(col0 And &HFF)
@@ -944,24 +945,25 @@ Public Class DDS_Encoder
         LowBytes = LowBytes Or (CULng(AlphaEndpoints(0) And &H3F) << 38)
         LowBytes = LowBytes Or (CULng(AlphaEndpoints(1) And &H3F) << 44)
         LowBytes = LowBytes Or ((CULng(ColorIndices(0)) And 1UL) << 50)
-        Dim HighBytes As ULong = 0UL
-        Dim bitPos As Integer = 51
-        For i As Integer = 1 To 15
-            If bitPos < 63 Then
-                LowBytes = LowBytes Or ((CULng(ColorIndices(i)) And 3UL) << bitPos)
-            ElseIf bitPos = 63 Then
-                LowBytes = LowBytes Or ((CULng(ColorIndices(i)) And 1UL) << 63)
-                HighBytes = HighBytes Or ((CULng(ColorIndices(i)) And 2UL) >> 1)
-            Else
-                HighBytes = HighBytes Or ((CULng(ColorIndices(i)) And 3UL) << (bitPos - 64))
-            End If
-            bitPos += 2
-        Next
+        LowBytes = LowBytes Or ((CULng(ColorIndices(1)) And 3UL) << 51)
+        LowBytes = LowBytes Or ((CULng(ColorIndices(2)) And 3UL) << 53)
+        LowBytes = LowBytes Or ((CULng(ColorIndices(3)) And 3UL) << 55)
+        LowBytes = LowBytes Or ((CULng(ColorIndices(4)) And 3UL) << 57)
+        LowBytes = LowBytes Or ((CULng(ColorIndices(5)) And 3UL) << 59)
+        LowBytes = LowBytes Or ((CULng(ColorIndices(6)) And 3UL) << 61)
+        LowBytes = LowBytes Or ((CULng(ColorIndices(7)) And 1UL) << 63)
+        Dim HighBytes As ULong = ((CULng(ColorIndices(7)) And 2UL) >> 1)
+        HighBytes = HighBytes Or ((CULng(ColorIndices(8)) And 3UL) << 1)
+        HighBytes = HighBytes Or ((CULng(ColorIndices(9)) And 3UL) << 3)
+        HighBytes = HighBytes Or ((CULng(ColorIndices(10)) And 3UL) << 5)
+        HighBytes = HighBytes Or ((CULng(ColorIndices(11)) And 3UL) << 7)
+        HighBytes = HighBytes Or ((CULng(ColorIndices(12)) And 3UL) << 9)
+        HighBytes = HighBytes Or ((CULng(ColorIndices(13)) And 3UL) << 11)
+        HighBytes = HighBytes Or ((CULng(ColorIndices(14)) And 3UL) << 13)
+        HighBytes = HighBytes Or ((CULng(ColorIndices(15)) And 3UL) << 15)
         HighBytes = HighBytes Or ((CULng(AlphaIndices(0)) And 3UL) << 17)
-        Dim shiftH As Integer = 19
-        For i As Integer = 1 To 15
-            HighBytes = HighBytes Or ((CULng(AlphaIndices(i)) And 7UL) << shiftH)
-            shiftH += 3
+        For i = 1 To 15
+            HighBytes = HighBytes Or ((CULng(AlphaIndices(i)) And 7UL) << (16 + (i * 3)))
         Next
         For i As Integer = 0 To 7
             Result(OutputOffset + i) = CByte((LowBytes >> (i << 3)) And &HFFUL)
@@ -1122,60 +1124,31 @@ Public Class DDS_Encoder
         Next
     End Sub
 
-    Private Sub GetEndpoints1D(LocalChannel() As Integer, Bits As Integer, Endpoints() As Integer, epOffset As Integer, Indices() As Integer, minVal As Integer, maxVal As Integer)
+    Private Sub GetEndpoints1D(LocalChannel() As Integer, EndpointBits As Integer, IndexBits As Integer, Endpoints() As Integer, epOffset As Integer, Indices() As Integer, minVal As Integer, maxVal As Integer)
+        Dim maxQuant As Integer = (1 << EndpointBits) - 1
         If minVal = maxVal Then
-            Endpoints(epOffset + 0) = minVal >> (8 - Bits)
-            Endpoints(epOffset + 1) = minVal >> (8 - Bits)
+            Dim ep As Integer = (minVal * maxQuant + 127) \ 255
+            Endpoints(epOffset + 0) = ep
+            Endpoints(epOffset + 1) = ep
             For i As Integer = 0 To 15
                 Indices(i) = 0
             Next
             Return
         End If
-        Dim shift As Integer = 8 - Bits
-        Dim ep0 As Integer = minVal >> shift
-        Dim ep1 As Integer = maxVal >> shift
+        Dim ep0 As Integer = (minVal * maxQuant + 127) \ 255
+        Dim ep1 As Integer = (maxVal * maxQuant + 127) \ 255
         Endpoints(epOffset + 0) = ep0
         Endpoints(epOffset + 1) = ep1
-        Dim ep0_8 As Integer
-        Dim ep1_8 As Integer
-        If Bits = 5 Then
-            ep0_8 = (ep0 << 3) Or (ep0 >> 2)
-            ep1_8 = (ep1 << 3) Or (ep1 >> 2)
-        Else
-            ep0_8 = ep0
-            ep1_8 = ep1
-        End If
+        Dim shift As Integer = 8 - EndpointBits
+        Dim ep0_8 As Integer = (ep0 << shift) Or (ep0 >> (EndpointBits - shift))
+        Dim ep1_8 As Integer = (ep1 << shift) Or (ep1 >> (EndpointBits - shift))
         Dim range As Integer = ep1_8 - ep0_8
         If range = 0 Then range = 1
+        Dim indexMax As Integer = (1 << IndexBits) - 1
         For i As Integer = 0 To 15
             Dim dist As Integer = LocalChannel(i) - ep0_8
-            Dim idx As Integer = (dist * 3 + (range >> 1)) \ range
-            If idx < 0 Then idx = 0 Else If idx > 3 Then idx = 3
-            Indices(i) = idx
-        Next
-    End Sub
-
-    Private Sub GetEndpoints1D_Mode4Alpha(LocalChannel() As Integer, Endpoints() As Integer, epOffset As Integer, Indices() As Integer, minVal As Integer, maxVal As Integer)
-        If minVal = maxVal Then
-            Endpoints(epOffset + 0) = minVal >> 2
-            Endpoints(epOffset + 1) = minVal >> 2
-            For i As Integer = 0 To 15
-                Indices(i) = 0
-            Next
-            Return
-        End If
-        Dim ep0 As Integer = minVal >> 2
-        Dim ep1 As Integer = maxVal >> 2
-        Endpoints(epOffset + 0) = ep0
-        Endpoints(epOffset + 1) = ep1
-        Dim ep0_8 As Integer = (ep0 << 2) Or (ep0 >> 4)
-        Dim ep1_8 As Integer = (ep1 << 2) Or (ep1 >> 4)
-        Dim range As Integer = ep1_8 - ep0_8
-        If range = 0 Then range = 1
-        For i As Integer = 0 To 15
-            Dim dist As Integer = LocalChannel(i) - ep0_8
-            Dim idx As Integer = (dist * 7 + (range >> 1)) \ range
-            If idx < 0 Then idx = 0 Else If idx > 7 Then idx = 7
+            Dim idx As Integer = (dist * indexMax + (range >> 1)) \ range
+            If idx < 0 Then idx = 0 Else If idx > indexMax Then idx = indexMax
             Indices(i) = idx
         Next
     End Sub
