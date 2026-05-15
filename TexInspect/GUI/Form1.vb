@@ -60,7 +60,7 @@ Public Class Form1
             Dim files() As String = DirectCast(e.Data.GetData(DataFormats.FileDrop), String())
             If files.Length > 0 Then
                 Dim FileExt As String = Path.GetExtension(files(0)).ToLower
-                If {".dds", ".png", ".jpg", ".jpeg", ".bmp", ".tga"}.Contains(FileExt) Then
+                If {".dds", ".png", ".jpg", ".jpeg", ".bmp"}.Contains(FileExt) Then
                     Await ProcessLoadedFileAsync(files(0))
                 Else
                     MessageBox.Show($"Invalid format: {FileExt}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Information)
@@ -87,7 +87,7 @@ Public Class Form1
     End Sub
 
     Private Async Sub LoadImageButton_Click(sender As Object, e As EventArgs) Handles LoadImageButton.Click
-        Using OFD As New OpenFileDialog With {.Filter = "Image Files|*.png;*.jpg;*.bmp;*.tga;*.dds"}
+        Using OFD As New OpenFileDialog With {.Filter = "Image Files|*.png;*.jpg;*.bmp;*.dds"}
             If OFD.ShowDialog() = DialogResult.OK Then
                 Await ProcessLoadedFileAsync(OFD.FileName)
             End If
