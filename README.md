@@ -6,9 +6,7 @@ A lightweight, fully managed DDS encoder and decoder. TexInspect is a zero-depen
 ## Features
 * **Tiny Footprint:** Under 100KB, portable even if you use floppy disks.
 * **Compatibility:** Only requires .NET 4.7.2, no extra runtimes or redistributables.  Compatible with Windows 7 SP1 - 11.
-* **Supported Modes:**
-    * **Encoding:** BC1 (DXT1), BC2 (DXT3), BC3 (DXT5), BC4 (ATI1), BC5 (ATI2), and BC7 (Fast).
-    * **Decoding:** BC1 (DXT1), BC2 (DXT3), BC3 (DXT5), BC4 (ATI1), BC5 (ATI2), and BC7 (Full).
+* **Full LDR Support:** Supports encdoing and decoding BC1-5, Legacy DXT1-5, DXT5n, ATI1, ATI2, and BC7.
 * **MipMaps:** Automated chain generation using Catmull-Rom downsampling.
 * **CubeMaps:** Automated decoding and saving of CubeMap arrays.
 * **Quality Analysis:** Supports assessing MSE, PSNR, and SSIM.
