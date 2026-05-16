@@ -408,7 +408,7 @@ Public Class DDS_Encoder
                                                           Case 5 ' BC5
                                                               EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 2, Result, currentBlockOffset, BufferA)
                                                               EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 1, Result, currentBlockOffset + 8, BufferB)
-                                                          Case 7 ' BC7
+                                                          Case 7 ' BC7 (Dynamic Mode 1, 6, 7)
                                                               EncodeBlockBC7(SourceData, xPixelBase, yPixelBase, Width, Height, Result, currentBlockOffset, BufferA, BufferB, BufferC, BufferD, BufferE, BufferF)
                                                           Case 30 ' DXT5n
                                                               EncodeBlockBC3(SourceData, xPixelBase, yPixelBase, Width, Height, 2, Result, currentBlockOffset, BufferA)
@@ -424,6 +424,8 @@ Public Class DDS_Encoder
     Private Sub EncodeBlockBC7n(SourceData As Byte(), xPixelBase As Integer, yPixelBase As Integer, Width As Integer, Height As Integer, Result As Byte(), OutputOffset As Integer, LocalR() As Integer, LocalG() As Integer, ColorEndpoints() As Integer, AlphaEndpoints() As Integer, ColorIndices() As Integer, AlphaIndices() As Integer)
         Dim minG As Integer = 255 : Dim maxG As Integer = 0
         Dim minR As Integer = 255 : Dim maxR As Integer = 0
+        Dim sumR As Integer = 0 : Dim sumSqR As Integer = 0
+        Dim sumG As Integer = 0 : Dim sumSqG As Integer = 0
         Dim LocalIndex As Integer = 0
         For j As Integer = 0 To 3
             Dim yPixel As Integer = Math.Min(yPixelBase + j, Height - 1)
@@ -439,24 +441,45 @@ Public Class DDS_Encoder
                 If gVal > maxG Then maxG = gVal
                 If rVal < minR Then minR = rVal
                 If rVal > maxR Then maxR = rVal
+                sumR += rVal
+                sumSqR += (rVal * rVal)
+                sumG += gVal
+                sumSqG += (gVal * gVal)
                 LocalIndex += 1
             Next
         Next
         Dim RangeG As Integer = maxG - minG
         Dim RangeR As Integer = maxR - minR
-        ColorEndpoints(0) = 0 : ColorEndpoints(1) = 0
-        ColorEndpoints(2) = 0 : ColorEndpoints(3) = 0
-        ColorEndpoints(4) = 0 : ColorEndpoints(5) = 0
-        If RangeR >= RangeG Then
-            GetEndpoints1D(LocalR, 6, 3, AlphaEndpoints, 0, AlphaIndices, minR, maxR)
-            GetEndpoints1D(LocalG, 5, 2, ColorEndpoints, 2, ColorIndices, minG, maxG)
-            ColorEndpoints(0) = 31 : ColorEndpoints(1) = 31
-            EncodeMode4(ColorEndpoints, AlphaEndpoints, ColorIndices, AlphaIndices, 1, Result, OutputOffset)
+        Dim varR As Integer = ((sumSqR << 4) - (sumR * sumR))
+        Dim varG As Integer = ((sumSqG << 4) - (sumG * sumG))
+        If varR < 1500 AndAlso varG < 1500 Then
+            If RangeG >= RangeR Then
+                GetEndpoints1D(LocalG, 7, 2, ColorEndpoints, 2, ColorIndices, minG, maxG)
+                GetEndpoints1D(LocalR, 8, 2, AlphaEndpoints, 0, AlphaIndices, minR, maxR)
+                ColorEndpoints(0) = 127 : ColorEndpoints(1) = 127
+                ColorEndpoints(4) = 127 : ColorEndpoints(5) = 127
+                EncodeMode5(ColorEndpoints, AlphaEndpoints, ColorIndices, AlphaIndices, 1, Result, OutputOffset)
+            Else
+                GetEndpoints1D(LocalR, 7, 2, ColorEndpoints, 0, ColorIndices, minR, maxR)
+                GetEndpoints1D(LocalG, 8, 2, AlphaEndpoints, 0, AlphaIndices, minG, maxG)
+                ColorEndpoints(2) = 127 : ColorEndpoints(3) = 127
+                ColorEndpoints(4) = 127 : ColorEndpoints(5) = 127
+                EncodeMode5(ColorEndpoints, AlphaEndpoints, ColorIndices, AlphaIndices, 2, Result, OutputOffset)
+            End If
         Else
-            GetEndpoints1D(LocalG, 6, 3, AlphaEndpoints, 0, AlphaIndices, minG, maxG)
-            GetEndpoints1D(LocalR, 5, 2, ColorEndpoints, 0, ColorIndices, minR, maxR)
-            ColorEndpoints(2) = 31 : ColorEndpoints(3) = 31
-            EncodeMode4(ColorEndpoints, AlphaEndpoints, ColorIndices, AlphaIndices, 2, Result, OutputOffset)
+            If RangeR >= RangeG Then
+                GetEndpoints1D(LocalR, 6, 3, AlphaEndpoints, 0, AlphaIndices, minR, maxR)
+                GetEndpoints1D(LocalG, 5, 2, ColorEndpoints, 2, ColorIndices, minG, maxG)
+                ColorEndpoints(0) = 31 : ColorEndpoints(1) = 31
+                ColorEndpoints(4) = 31 : ColorEndpoints(5) = 31
+                EncodeMode4(ColorEndpoints, AlphaEndpoints, ColorIndices, AlphaIndices, 1, Result, OutputOffset)
+            Else
+                GetEndpoints1D(LocalG, 6, 3, AlphaEndpoints, 0, AlphaIndices, minG, maxG)
+                GetEndpoints1D(LocalR, 5, 2, ColorEndpoints, 0, ColorIndices, minR, maxR)
+                ColorEndpoints(2) = 31 : ColorEndpoints(3) = 31
+                ColorEndpoints(4) = 31 : ColorEndpoints(5) = 31
+                EncodeMode4(ColorEndpoints, AlphaEndpoints, ColorIndices, AlphaIndices, 2, Result, OutputOffset)
+            End If
         End If
     End Sub
 
@@ -910,6 +933,53 @@ Public Class DDS_Encoder
         HighBytes = HighBytes Or ((CULng(Indices(0)) And 7UL) << 1)
         For i As Integer = 1 To 15
             HighBytes = HighBytes Or ((CULng(Indices(i)) And 15UL) << (i * 4))
+        Next
+        For i As Integer = 0 To 7
+            Result(OutputOffset + i) = CByte((LowBytes >> (i << 3)) And &HFFUL)
+            Result(OutputOffset + 8 + i) = CByte((HighBytes >> (i << 3)) And &HFFUL)
+        Next
+    End Sub
+
+    Private Sub EncodeMode5(ColorEndpoints() As Integer, AlphaEndpoints() As Integer, ColorIndices() As Integer, AlphaIndices() As Integer, Rotation As Integer, Result As Byte(), OutputOffset As Integer)
+        If ColorIndices(0) >= 2 Then
+            Dim t As Integer
+            t = ColorEndpoints(0) : ColorEndpoints(0) = ColorEndpoints(1) : ColorEndpoints(1) = t
+            t = ColorEndpoints(2) : ColorEndpoints(2) = ColorEndpoints(3) : ColorEndpoints(3) = t
+            t = ColorEndpoints(4) : ColorEndpoints(4) = ColorEndpoints(5) : ColorEndpoints(5) = t
+            For i As Integer = 0 To 15
+                ColorIndices(i) = 3 - ColorIndices(i)
+            Next
+        End If
+        If AlphaIndices(0) >= 2 Then
+            Dim t As Integer
+            t = AlphaEndpoints(0) : AlphaEndpoints(0) = AlphaEndpoints(1) : AlphaEndpoints(1) = t
+            For i As Integer = 0 To 15
+                AlphaIndices(i) = 3 - AlphaIndices(i)
+            Next
+        End If
+        Dim LowBytes As ULong = &H20UL
+        LowBytes = LowBytes Or (CULng(Rotation And 3) << 6)
+        LowBytes = LowBytes Or (CULng(ColorEndpoints(0) And &H7F) << 8)
+        LowBytes = LowBytes Or (CULng(ColorEndpoints(1) And &H7F) << 15)
+        LowBytes = LowBytes Or (CULng(ColorEndpoints(2) And &H7F) << 22)
+        LowBytes = LowBytes Or (CULng(ColorEndpoints(3) And &H7F) << 29)
+        LowBytes = LowBytes Or (CULng(ColorEndpoints(4) And &H7F) << 36)
+        LowBytes = LowBytes Or (CULng(ColorEndpoints(5) And &H7F) << 43)
+        LowBytes = LowBytes Or (CULng(AlphaEndpoints(0) And &HFF) << 50)
+        Dim A1 As ULong = CULng(AlphaEndpoints(1) And &HFF)
+        LowBytes = LowBytes Or ((A1 And &H3FUL) << 58)
+        Dim HighBytes As ULong = (A1 >> 6)
+        HighBytes = HighBytes Or ((CULng(ColorIndices(0)) And 1UL) << 2)
+        Dim shift As Integer = 3
+        For i As Integer = 1 To 15
+            HighBytes = HighBytes Or ((CULng(ColorIndices(i)) And 3UL) << shift)
+            shift += 2
+        Next
+        HighBytes = HighBytes Or ((CULng(AlphaIndices(0)) And 1UL) << shift)
+        shift += 1
+        For i As Integer = 1 To 15
+            HighBytes = HighBytes Or ((CULng(AlphaIndices(i)) And 3UL) << shift)
+            shift += 2
         Next
         For i As Integer = 0 To 7
             Result(OutputOffset + i) = CByte((LowBytes >> (i << 3)) And &HFFUL)
